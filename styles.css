@@ -1,0 +1,698 @@
+/* Vancouver Solar Shading Explorer 6 */
+:root{
+  --paper:#EDF0EE; --panel:#FDFDFC; --ink:#18211F; --ink2:#4B5855; --ink3:#7D8A87;
+  --rule:#C7D1CE; --rule2:#DDE4E1;
+  --glass:#2F6F68; --glassfill:rgba(47,111,104,.15); --glasssoft:rgba(47,111,104,.08);
+  --sun:#D9821A; --sunsoft:rgba(217,130,26,.16);
+  --shade:#93A6AA; --shadefill:#C4D0D2; --poche:#243230;
+  --warn:#8A5A12;
+  --sans:"IBM Plex Sans",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+  --cond:"IBM Plex Sans Condensed","IBM Plex Sans",sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:var(--paper); color:var(--ink); font-family:var(--sans);
+  font-size:15px; line-height:1.55; -webkit-font-smoothing:antialiased;
+}
+h1,h2,h3,h4{font-family:var(--cond); font-weight:600; letter-spacing:.005em; margin:0}
+a{color:var(--glass)}
+button{font:inherit}
+
+/* ---------- masthead ---------- */
+.masthead{
+  border-bottom:1px solid var(--rule); background:var(--panel);
+  padding:14px 22px; display:flex; flex-wrap:wrap; gap:14px 26px; align-items:baseline;
+  position:relative; z-index:5;
+}
+.masthead h1{font-size:23px; line-height:1.1}
+.masthead .sub{color:var(--ink2); font-size:13.5px; max-width:52ch}
+.chips{display:flex; gap:8px; flex-wrap:wrap; margin-left:auto}
+.chip{
+  font-family:var(--mono); font-size:11.5px; color:var(--ink2);
+  border:1px solid var(--rule); border-radius:2px; padding:3px 8px; background:var(--paper);
+}
+.chip b{color:var(--ink); font-weight:500}
+.hbtn{cursor:pointer; font-family:var(--mono); font-size:11.5px; line-height:1.35}
+.hbtn:disabled{opacity:.4; cursor:default}
+.hbtn:not(:disabled):hover{border-color:var(--glass); color:var(--ink)}
+
+/* ---------- shell ---------- */
+.shell{display:grid; grid-template-columns:minmax(0,1fr); align-items:start}
+/* Simple mode: what it does not have is not there */
+body.simple .adv, body.simple .laygrp[data-grp="site"], body:not(.simple) .simpleonly{display:none !important}
+/* the bar's one row: nothing wraps; a menu narrows before anything else gives, and what will not fit is clipped across - never down */
+.vbarrow{display:flex; align-items:center; gap:8px; flex-wrap:nowrap; overflow-x:clip; overflow-y:visible; min-width:0; contain:inline-size}
+.vbarrow>*{flex-shrink:0}
+/* the view's own buttons pinned to the bar's right end: what does not fit goes under them, never them */
+.vbarrow{padding-right:62px}
+.vbarrow>.vbtns{position:absolute; right:10px; top:7px; margin:0; background:var(--panel); padding-left:6px; box-shadow:-10px 0 8px -4px var(--panel)}
+.vbarrow select, .vbarrow>.barsel{flex-shrink:1; min-width:4.5em}
+.vbarrow select{text-overflow:ellipsis}
+.vbarrow .vtype{flex-shrink:0; min-width:0}
+.vbarrow .barsel, .vbarrow .barchk{white-space:nowrap}
+/* floating over the drawing */
+.vhost{position:relative}
+.vfloat{position:absolute; z-index:3; display:flex; align-items:center; gap:4px}
+/* the camera's buttons: at the drawing's top right, and held there under the bar while any of the drawing is in sight */
+.vfloat.vfTR{position:sticky; top:calc(var(--cbh, 0px) + var(--vbh, 38px) + 6px); height:30px; margin-bottom:-30px; justify-content:flex-end; align-items:flex-start; padding:0 8px 0 0; pointer-events:none}
+.vfloat.vfTR>*{pointer-events:auto}
+/* the view's foot line over them, so they slide under it as the view leaves */
+.view>.vtitle{position:relative; z-index:4; background:var(--panel)}
+.vfBL{left:8px; bottom:6px; padding:2px 7px; border-radius:4px; background:color-mix(in srgb, var(--panel) 88%, transparent); border:1px solid var(--rule2)}
+.vfBL .barvals{font-size:11px}
+.vbtns .vb svg, #dockFull svg{display:block}
+.vbtns .vb[data-vfull], #dockFull{display:inline-flex; align-items:center; justify-content:center}
+.minibtn.iconbtn{display:inline-flex; align-items:center; justify-content:center; padding:3px 6px; line-height:0}
+.modeseg button[aria-pressed="true"]{background:var(--ink); color:var(--panel); border-color:var(--ink)}
+.ctxmenu .popnote{display:block; margin:0 4px 6px; font-size:12px; color:var(--ink2); max-width:250px; line-height:1.35}
+/* the panel is empty: everything it held is on the drawings, their bars and small windows, and the settings bar */
+.shell>.rail{display:none}
+.calcbar .libmenu{width:min(360px, 90vw); max-height:60vh; overflow:auto}
+.calcbar .expmenu{width:min(300px, 90vw)}
+.view .axTyp{max-width:13em}
+.view .beamDD .ddmenu{display:grid; gap:8px; min-width:12em}
+.seg.vstack{display:grid; gap:3px}
+.seg.vstack button{text-align:left}
+.view .axSite .ddmenu{display:grid; gap:6px; min-width:15em}
+.rail{
+  border-right:1px solid var(--rule); background:var(--panel);
+  position:sticky; top:0; max-height:100vh; overflow-y:auto; padding-bottom:40px;
+}
+.field{padding:0 0 26px}
+
+/* ---------- controls ---------- */
+.grp{border-bottom:1px solid var(--rule2)}
+.grp>summary{
+  font-family:var(--cond); font-size:14.5px; font-weight:600; padding:11px 16px;
+  cursor:pointer; list-style:none; display:flex; align-items:center; gap:8px;
+}
+.grp>summary::-webkit-details-marker{display:none}
+.grp>summary::before{content:"+"; font-family:var(--mono); color:var(--ink3); font-size:14px}
+.grp[open]>summary::before{content:"–"}
+.grp>summary:hover{background:var(--paper)}
+.grpbody{padding:2px 16px 16px}
+.ctl{margin-bottom:11px}
+.ctl>label{display:flex; justify-content:space-between; align-items:baseline; gap:10px; font-size:12.5px; color:var(--ink2)}
+.ctlhd{display:flex; justify-content:space-between; align-items:baseline; gap:10px; font-size:12.5px; color:var(--ink2)}
+.ctl .val{
+  font-family:var(--mono); font-size:12px; color:var(--ink); white-space:nowrap;
+  cursor:text; border-bottom:1px dotted var(--rule); padding-bottom:1px;
+}
+.ctl .val:hover,.ctl .val:focus{border-bottom-color:var(--glass); outline:none}
+.valbox{
+  width:9ch; padding:0 3px; font-family:var(--mono); font-size:12px; text-align:right;
+  border:1px solid var(--glass); border-radius:2px; background:var(--panel); color:var(--ink);
+}
+input[type=range]{width:100%; margin:3px 0 0; accent-color:var(--glass); height:18px}
+select,input[type=number]{
+  width:100%; padding:5px 7px; border:1px solid var(--rule); border-radius:2px;
+  background:var(--panel); color:var(--ink); font:inherit; font-size:13px; margin-top:3px;
+}
+.seg{display:flex; flex-wrap:wrap; gap:4px; margin-top:4px}
+.seg button{
+  flex:1 1 auto; min-width:52px; padding:5px 4px; font-size:12px; border:1px solid var(--rule);
+  background:var(--panel); color:var(--ink2); border-radius:2px; cursor:pointer;
+}
+.seg button[aria-pressed=true]{background:var(--poche); color:#fff; border-color:var(--poche)}
+.chk{display:flex; gap:8px; align-items:flex-start; font-size:12.5px; color:var(--ink2); margin:9px 0}
+.chk input{margin:3px 0 0; accent-color:var(--glass); flex:none}
+.presets{display:grid; gap:5px}
+.presets button{
+  text-align:left; padding:7px 9px; border:1px solid var(--rule); background:var(--panel);
+  border-radius:2px; cursor:pointer; font-size:12.5px; color:var(--ink);
+}
+.presets button:hover{border-color:var(--glass)}
+.presets span{display:block; font-size:11.5px; color:var(--ink3); font-family:var(--mono)}
+.presets.typs{grid-template-columns:1fr 1fr; gap:4px}
+.presets.typs button{padding:6px 7px; font-size:12px; line-height:1.25}
+.presets.typs span{font-size:10.5px; margin-top:2px}
+.subhd.first{margin-top:2px; padding-top:0; border-top:0}
+.hint{font-size:11.5px; color:var(--ink3); margin:5px 0 0}
+.subhd{font-size:11.5px; letter-spacing:.08em; text-transform:uppercase; color:var(--ink3);
+  margin:14px 0 2px; padding-top:8px; border-top:1px solid var(--rule2)}
+
+/* ---------- sheet of drawings ---------- */
+.sheet{display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:1px; background:var(--rule); border-bottom:1px solid var(--rule)}
+.view{background:var(--panel); display:flex; flex-direction:column; min-width:0}
+.view>svg{width:100%; height:auto; display:block}
+.sheet>.view:last-child:nth-child(odd){grid-column:1 / -1}
+
+.tblock{
+  display:flex; flex-wrap:nowrap; gap:2px 16px; align-items:baseline; overflow:hidden; white-space:nowrap; min-width:0; contain:inline-size;
+  border-top:1px solid var(--rule2); padding:7px 12px; margin-top:auto;
+}
+.tblock h3{font-size:13px; margin-right:4px}
+.tblock .m{font-family:var(--mono); font-size:11px; color:var(--ink3)}
+.tblock .m b{color:var(--ink2); font-weight:400}
+.tblock .m.ed b.scrub{cursor:ew-resize; border-bottom:1px dotted var(--ink3)}
+.tblock .m.ed .val{color:var(--ink); cursor:text; border-bottom:1px dashed var(--rule)}
+.tblock .m.ed .val:hover{border-bottom-color:var(--glass)}
+.tblock .m.ed .val input{font:inherit; width:6.5em; padding:0 3px; margin:0}
+.tblock .m strong.tbig{font-weight:600; font-size:13px; color:var(--ink)}
+
+/* ---------- 3D pane ---------- */
+.v3dbar{display:block; padding:7px 10px; border-bottom:1px solid var(--rule2); position:relative; z-index:4}
+.dd{position:relative}
+.dd>summary{
+  list-style:none; cursor:pointer; font-size:12px; padding:3px 9px; user-select:none;
+  border:1px solid var(--rule); border-radius:2px; background:var(--panel); color:var(--ink2);
+}
+.dd>summary::-webkit-details-marker{display:none}
+.dd>summary::after{content:" \25BE"; color:var(--ink3)}
+.dd>summary:hover{border-color:var(--glass)}
+.dd[open]>summary{border-color:var(--glass); color:var(--ink)}
+.ddmenu{
+  position:absolute; z-index:20; top:calc(100% + 4px); left:0; min-width:272px;
+  background:var(--panel); border:1px solid var(--rule); border-radius:2px; padding:7px 11px;
+  box-shadow:0 7px 20px rgba(24,33,31,.14);
+}
+.ddmenu .chk{margin:3px 0; font-size:12px}
+.minibtn{
+  font-size:12px; padding:3px 9px; border:1px solid var(--rule); border-radius:2px;
+  background:var(--panel); color:var(--ink2); cursor:pointer;
+}
+.minibtn:hover{border-color:var(--glass); color:var(--ink)}
+.minibtn[aria-pressed=true]{background:var(--poche); color:#fff; border-color:var(--poche)}
+.v3dhint{font-family:var(--mono); font-size:10.5px; color:var(--ink3); margin-left:auto}
+.v3dhost{touch-action:none; cursor:grab; -webkit-user-select:none; user-select:none}
+#vSun svg{touch-action:none; cursor:crosshair; -webkit-user-select:none; user-select:none}
+.v3dhost.drag{cursor:grabbing}
+.v3dhost>svg{width:100%; height:auto; display:block}
+#axonTitle{margin-top:auto}
+
+/* ---------- sections ---------- */
+section{padding:22px 24px; border-bottom:1px solid var(--rule)}
+section>h2{font-size:18px; margin-bottom:3px}
+section>.lede{color:var(--ink2); font-size:13.5px; max-width:74ch; margin:0 0 16px}
+
+/* results table */
+.readout{display:grid; grid-template-columns:repeat(auto-fit,minmax(215px,1fr)); gap:0 26px}
+.readout dl{margin:0; border-top:2px solid var(--poche)}
+.readout dt{font-size:12.5px; color:var(--ink2); float:left; clear:left; padding:5px 0}
+.readout dd{
+  margin:0; font-family:var(--mono); font-size:12.5px; text-align:right; padding:5px 0;
+  border-bottom:1px solid var(--rule2);
+}
+.readout dd.big{font-size:15px}
+.readout h4{font-size:12.5px; font-family:var(--sans); font-weight:600; padding:7px 0 3px; color:var(--ink)}
+.nosun{background:var(--sunsoft); border-left:3px solid var(--sun); padding:9px 12px; margin:14px 0 0; font-size:13px}
+
+/* charts */
+.charts{display:grid; grid-template-columns:repeat(auto-fit,minmax(310px,1fr)); gap:20px}
+.chart{border:1px solid var(--rule); background:var(--panel); padding:11px 12px 9px}
+.chart h4{font-size:13.5px; margin-bottom:2px}
+.chart p{font-size:11.5px; color:var(--ink3); margin:0 0 7px}
+.chart svg{width:100%; height:auto; display:block}
+
+/* provenance + compliance */
+.prov{display:inline-flex; align-items:center; gap:5px; font-size:11px; font-family:var(--mono); color:var(--ink2); white-space:nowrap}
+.mk{width:11px; height:11px; flex:none; border:1px solid var(--poche); border-radius:50%}
+.mk.file{background:var(--poche)}
+.mk.cited{background:linear-gradient(90deg,var(--poche) 50%,transparent 50%)}
+.mk.none{border-radius:0; background-image:repeating-linear-gradient(45deg,var(--ink3) 0 1.5px,transparent 1.5px 4px)}
+
+.rules{display:grid; gap:0; border-top:2px solid var(--poche)}
+.rule{border-bottom:1px solid var(--rule2)}
+.rule>summary{
+  display:grid; grid-template-columns:minmax(0,1fr) auto auto; gap:8px 14px; align-items:baseline;
+  padding:10px 2px; cursor:pointer; list-style:none;
+}
+.rule>summary::-webkit-details-marker{display:none}
+.rule>summary:hover{background:var(--panel)}
+.rule .name{font-size:13.5px}
+.rule .cite{font-family:var(--mono); font-size:11px; color:var(--ink3)}
+.rule .verdict{font-family:var(--mono); font-size:12px; text-align:right}
+.v-ok{color:var(--glass)}
+.v-no{color:#A23A16; font-weight:500}
+.v-need{color:var(--warn)}
+.v-na{color:var(--ink3)}
+.v-info{color:var(--ink2)}
+.rule .why{
+  padding:0 2px 14px 16px; border-left:2px solid var(--rule); margin:0 0 10px 2px;
+  font-size:13px; color:var(--ink2); max-width:80ch;
+}
+.rule .why q{display:block; font-style:normal; border-left:3px solid var(--sun); padding:6px 10px; margin:8px 0; background:var(--panel); font-size:12.5px}
+.rule .why .tag{font-family:var(--mono); font-size:11px; color:var(--ink3); display:block; margin-top:6px}
+.notestab{width:100%; border-collapse:collapse; font-size:13px; margin-top:6px}
+.notestab th,.notestab td{text-align:left; padding:7px 10px 7px 0; border-bottom:1px solid var(--rule2); vertical-align:top}
+.notestab th{font-weight:600; font-size:12px; color:var(--ink2)}
+.notestab td.n{font-family:var(--mono); font-size:12px; white-space:nowrap}
+
+.callout{border:1px solid var(--rule); border-left:4px solid var(--poche); background:var(--panel); padding:12px 15px; margin:0 0 18px; max-width:82ch}
+.callout h3{font-size:14px; margin-bottom:4px}
+.callout p{margin:6px 0 0; font-size:13px; color:var(--ink2)}
+.hatchbox{background-image:repeating-linear-gradient(45deg,var(--rule) 0 1px,transparent 1px 6px)}
+
+.cols2{display:grid; grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); gap:22px}
+.cols2 h3{font-size:14px; margin-bottom:5px}
+.cols2 ul{margin:0; padding-left:18px; font-size:13px; color:var(--ink2)}
+.cols2 li{margin-bottom:6px}
+.cols2 p{font-size:13px; color:var(--ink2)}
+code{font-family:var(--mono); font-size:12px; background:var(--panel); border:1px solid var(--rule2); padding:1px 4px; border-radius:2px}
+.eq{font-family:var(--mono); font-size:12.5px; background:var(--panel); border:1px solid var(--rule2); padding:9px 11px; margin:7px 0; overflow-x:auto; white-space:pre}
+
+footer{padding:18px 24px 40px; font-size:12px; color:var(--ink3); max-width:88ch}
+
+/* ---------- the rail's own parts ---------- */
+.grp>summary .sumtag{margin-left:auto; font-family:var(--mono); font-size:11px; font-weight:400; color:var(--ink3)}
+.seg button.primary{background:var(--glass); color:#fff; border-color:var(--glass)}
+.seg button.primary:hover{filter:brightness(1.08)}
+.seg button.quiet{flex:0 0 auto; color:var(--ink3); border-style:dashed}
+.seg button.on{background:var(--poche); color:#fff; border-color:var(--poche)}
+.seg.wrap button{flex:0 1 auto; min-width:34px}
+.seg select{flex:1 1 auto; width:auto; margin-top:0; font-size:12px; padding:4px 6px}
+.stepper{align-items:center; flex-wrap:nowrap}
+.stepper button{flex:0 0 34px; min-width:34px}
+.stepper .stepv{flex:1; text-align:center; font-family:var(--mono); font-size:12px}
+.stpick{display:flex; gap:4px; align-items:stretch; margin:4px 0 6px}
+.stpick select{flex:1; margin:0; font-family:var(--mono); font-size:12px; min-width:0}
+.stpick button{flex:none; width:30px; border:1px solid var(--rule); background:var(--panel); color:var(--ink2); border-radius:2px; cursor:pointer; font-size:14px}
+.stpick button:hover:not(:disabled){border-color:var(--glass)}
+.stops button{min-width:0; flex:1 1 30%}
+.seg button:disabled,.stpick button:disabled{opacity:.4; cursor:default}
+.md{display:flex; gap:4px}
+.mdbox{width:5.2ch; padding:0 4px; font-family:var(--mono); font-size:12px; text-align:center;
+  border:1px solid var(--rule); border-radius:2px; background:var(--panel); color:var(--ink)}
+.mdbox.day{width:3.6ch}
+.mdbox:focus{border-color:var(--glass); outline:none}
+.cgrid{border-collapse:collapse; margin:4px 0 8px; font-size:12px}
+.cgrid th,.cgrid td{padding:2px 6px; text-align:center}
+.cgrid th button{border:1px solid var(--rule); background:var(--panel); border-radius:2px; font-family:var(--mono); font-size:11px; cursor:pointer; min-width:26px; color:var(--ink2)}
+.cgrid th button:hover{border-color:var(--glass)}
+.cgrid input{accent-color:var(--glass)}
+.cgrid .src{color:var(--glass)}
+.barsel{display:inline-flex; align-items:center; gap:6px; font-size:12px; color:var(--ink2)}
+.barsel select{width:auto; margin:0; padding:3px 6px; font-size:12px}
+.barsel.wx{margin:0 0 14px}
+.v3dhost.rot{cursor:grab}
+.v3dhost.rot:not(.drag){cursor:alias}
+.namectl{display:flex; align-items:center; gap:10px}
+.namectl>label{flex:none}
+.namebox{flex:1; min-width:0; padding:3px 6px; font:inherit; font-size:12.5px; border:1px solid var(--rule); border-radius:2px; background:var(--panel); color:var(--ink)}
+.namebox:focus{border-color:var(--glass); outline:none}
+.namebox::placeholder{color:var(--ink3)}
+
+/* ---------- the four steps ---------- */
+.step{padding:0 0 18px; border-bottom:1px solid var(--rule)}
+.stephd{display:flex; gap:14px; align-items:flex-start; padding:18px 24px 14px}
+.stepn{flex:none; width:30px; height:30px; border-radius:50%; background:var(--poche); color:#fff;
+  font-family:var(--cond); font-weight:600; font-size:16px; display:flex; align-items:center; justify-content:center; margin-top:2px}
+.stephd h2{font-size:19px; margin-bottom:3px}
+.stephd p{margin:0; font-size:13.5px; color:var(--ink2); max-width:86ch}
+.step .sheet{border-top:1px solid var(--rule)}
+.grp>summary .gn{display:inline-flex; width:18px; height:18px; border-radius:50%; background:var(--poche); color:#fff;
+  font-family:var(--cond); font-size:11.5px; align-items:center; justify-content:center; margin-right:2px}
+.stepbar{display:flex; flex-wrap:wrap; gap:10px 18px; align-items:center; padding:0 24px 12px}
+.seg.mini{margin:0; flex-wrap:nowrap}
+.seg.mini button{flex:0 0 auto; min-width:0; padding:3px 9px; font-size:11.5px}
+.chk.inl{margin:0; font-size:12px}
+
+/* ---------- the worked calculations ---------- */
+.calc{padding:14px 24px 4px}
+.calc h4{font-size:13px; margin:0 0 6px; font-family:var(--sans); font-weight:600}
+.flow{display:flex; align-items:stretch; gap:10px; flex-wrap:wrap}
+.fcol{display:flex; flex-direction:column; gap:6px; flex:1 1 200px; min-width:0}
+.arrow{align-self:center; color:var(--ink3); font-size:18px}
+.fbox{border:1px dashed var(--ink3); padding:6px 10px; background:var(--panel); border-radius:2px}
+.fbox span{display:block; font-size:11.5px; color:var(--ink3)}
+.fbox b{font-family:var(--mono); font-weight:500; font-size:13px; color:var(--ink)}
+.fbox.key{border:1px solid var(--sun); background:var(--sunsoft)}
+.fbox.dim b{color:var(--ink3)}
+.eqline{font-family:var(--mono); font-size:12px; color:var(--ink2); margin:3px 0; line-height:1.5}
+.eqline b{color:var(--ink); font-weight:500}
+.eqline .dim{color:var(--ink3)}
+.calcgrid{display:grid; grid-template-columns:repeat(auto-fit,minmax(340px,1fr)); gap:10px 28px}
+.calcresult{font-size:13px; margin:10px 0 4px; padding:8px 12px; border-left:3px solid var(--poche); background:var(--panel)}
+.calcnote{font-size:12.5px; color:var(--ink3); margin:8px 0 4px; max-width:100ch}
+.figs{display:grid; grid-template-columns:repeat(auto-fit,minmax(210px,1fr)); gap:12px; margin-bottom:10px}
+.fig{border-top:3px solid var(--sun); background:var(--panel); padding:9px 12px}
+.fig span{display:block; font-size:12px; color:var(--ink2)}
+.fig b{display:block; font-family:var(--mono); font-weight:500; font-size:22px; color:var(--ink); margin:2px 0}
+.fig em{display:block; font-style:normal; font-size:11.5px; color:var(--ink3); font-family:var(--mono)}
+.fig{position:relative}
+.fig.key{border-top-color:var(--glass)}
+.fig.ok{border-top-color:var(--glass)} .fig.ok b{color:var(--glass)}
+.fig.no{border-top-color:#A23A16} .fig.no b{color:#A23A16}
+.fig.dim b{color:var(--ink3)}
+.fx{position:absolute; top:6px; right:6px; width:20px; height:20px; border:1px solid var(--rule); border-radius:50%; background:var(--paper, #fff);
+  font-family:Georgia, serif; font-style:italic; font-size:12px; line-height:1; color:var(--ink2); cursor:pointer; padding:0}
+.fx:hover,.fx[aria-expanded=true]{border-color:var(--glass); color:var(--glass)}
+.fxpop{position:absolute; z-index:30; top:30px; right:0; width:min(420px, 92vw); background:var(--panel); border:1px solid var(--rule);
+  box-shadow:0 6px 18px rgba(0,0,0,.12); padding:8px 12px}
+.fxpop[hidden]{display:none}
+.recs{border-bottom:none}
+/* the dock: fixed at the foot of the drawings, as the settings bar is at their head */
+.dock{position:fixed; left:var(--dockL, 0px); right:0; bottom:0; height:var(--dockH, 38vh); z-index:28; background:var(--paper);
+  border-top:2px solid var(--poche); display:flex; flex-direction:column; box-shadow:0 -6px 18px rgba(0,0,0,.08)}
+.dock{padding:0}
+.dock.min{height:auto}
+.dock.min .dockbody{display:none}
+.dock.full{top:var(--dockT, 0px); height:auto}
+.dockgrip{position:absolute; left:0; right:0; top:-5px; height:9px; cursor:ns-resize; z-index:2}
+.dock.min .dockgrip,.dock.full .dockgrip{display:none}
+.dockbar{display:flex; align-items:center; gap:10px; padding:2px 10px 2px 18px; border-bottom:1px solid var(--rule); background:var(--panel); flex:none}
+.dockbar .vb{padding:1px 6px}
+.docktitle{font-family:var(--cond); font-weight:600; font-size:13.5px; color:var(--ink); white-space:nowrap; flex:none}
+.dockfor{flex:1 1 auto; min-width:0; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; font-family:var(--mono); font-size:11px; color:var(--ink3)}
+.dockbody{flex:1 1 auto; min-height:0; overflow:auto}
+/* the solar heat gain: a thin row of three under the calculation settings, tucked away on its own */
+.gainrow{flex-basis:100%; display:flex; align-items:center; gap:6px 12px; margin:0 -18px -8px; padding:4px 18px 5px; border-top:1px solid var(--rule2)}
+.gainfigs{flex:1 1 auto; min-width:0}
+.gainfigs .figs{grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; margin:0}
+.gainfigs .fig{border-top:0; border-left:3px solid var(--sun); padding:2px 28px 2px 8px; display:flex; align-items:baseline; gap:8px; white-space:nowrap; min-width:0}
+.gainfigs .fig span{display:inline; font-size:11.5px; flex:none}
+.gainfigs .fig b{display:inline; font-size:15px; margin:0; flex:none}
+.gainfigs .fig em{display:inline; font-size:10.5px; overflow:hidden; text-overflow:ellipsis; min-width:0}
+.gainfigs .fx{top:50%; margin-top:-9px; width:18px; height:18px; font-size:11px}
+.gainfigs .fxpop{top:calc(100% + 4px); white-space:normal}
+.gainfigs .calcnote{margin:0}
+.gainrow .cbtitle{white-space:nowrap; flex:none}
+body.gaintucked .gainfigs{display:none}
+body.gaintucked .gainrow{padding:2px 18px}
+/* a member count tried on a recommendation */
+.rechd{display:flex; align-items:baseline; justify-content:space-between; gap:10px; flex-wrap:wrap; max-width:420px}
+.reccard.ideal{position:relative; min-width:0}
+.reccard.ideal .rechd{display:grid; grid-template-rows:auto auto; gap:6px; max-width:none; min-height:54px; align-content:start}
+.reccard.ideal h4{white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin:0; padding-right:44px}
+.reccard.ideal .idlive.on{position:absolute; top:0; right:0}
+.recn{display:inline-flex; align-items:center; gap:6px; font-size:12px; color:var(--ink2); cursor:help}
+.recn input{width:110px; margin:0}
+.recn output{font-family:var(--mono); min-width:2ch; color:var(--ink)}
+.checksec{border-top:1px solid var(--rule)}
+/* a view's own switches in its bar */
+/* the date and the time, a slider and a figure that can be typed, in the settings bar */
+.barslide{display:inline-flex; align-items:center; gap:6px; font-size:12px; color:var(--ink2); white-space:nowrap; flex:none}
+.barslide input[type=range]{width:150px; margin:0}
+.barslide .val{min-width:4.2em; font-family:var(--mono); font-size:12px; color:var(--ink); border-bottom:1px dotted var(--rule); cursor:text}
+/* the selected storey's icons in the site view */
+.stackbtn{cursor:pointer}
+.stackbg{cursor:move}
+/* the window button keeps one width whichever it says, so the bar does not re-wrap under the drawing */
+.minibtn.addWin{min-width:13.2em; text-align:center}
+.stackbtn.off{cursor:default}
+.stackbtn:not(.off):hover rect{stroke-width:1.6}
+/* the picked device's settings, off its gumball on a plan or a section */
+.view{position:relative}
+.devpop{position:fixed; z-index:27; display:grid; gap:3px; padding:5px 7px 6px; background:var(--panel); border:1px solid var(--rule); border-radius:5px; box-shadow:0 3px 10px rgba(0,0,0,.13); font-size:10.5px}
+.devpop .seg.mini button{padding:1px 6px; font-size:10.5px; line-height:1.5}
+.devpop .barchk{font-size:10.5px}
+.devpop[hidden]{display:none}
+.devpop .dvhd{display:flex; align-items:center; justify-content:space-between; gap:8px; font-weight:600; color:var(--ink2); cursor:move; user-select:none; margin:-1px -3px 1px 0}
+.devpop .dvbtns{display:inline-flex; gap:2px}
+.devpop .dvbtns button{border:0; background:none; color:var(--ink3); font-size:12px; line-height:1; padding:1px 4px; cursor:pointer; border-radius:3px}
+.devpop .dvbtns button:hover{background:var(--rule2); color:var(--ink)}
+.devpop.min>:not(.dvhd){display:none}
+.devpop .dvgrp{display:flex; align-items:center; justify-content:space-between; gap:8px}
+.devpop .dvlab{color:var(--ink3)}
+.devpop .dvname{font:inherit; font-weight:600; color:var(--ink2); background:none; border:1px solid transparent; border-radius:3px; padding:0 3px; margin-left:-4px; min-width:0; width:13em; cursor:text}
+.devpop .dvname:hover{border-color:var(--rule2)}
+.devpop .dvname:focus{border-color:var(--glass); background:var(--panel2, var(--panel)); outline:none}
+.devpop .dvrow{display:flex; flex-wrap:wrap; gap:4px; align-items:center}
+.devpop .dvrow:empty{display:none}
+.devpop .dvnote{color:var(--ink3); max-width:17em; line-height:1.35}
+.devpop .pbtn{font:inherit; font-size:10.5px; padding:1px 7px; line-height:1.5; border:1px solid var(--rule); border-radius:3px; background:var(--panel); color:var(--ink2); cursor:pointer}
+.devpop .pbtn:hover:not(:disabled){border-color:var(--glass); color:var(--ink)}
+.devpop .pbtn:disabled{opacity:.35; cursor:default}
+.devpop .pbtn.quiet{color:var(--ink3)}
+.devpop .pbtn.link{border:0; padding:0; background:none; text-decoration:underline; color:var(--glass)}
+.devpop .pbtn.danger{color:#C0442B; border-color:#e3b3a8}
+.devpop .pmenu{font:inherit; font-size:10.5px; max-width:16em}
+.devpop .stgrid{display:grid; gap:3px}
+.devpop .strow{display:grid; grid-template-columns:18px 22px 22px; align-items:center; gap:3px; color:var(--glass)}
+.devpop .pbtn.arw{padding:0; color:var(--glass); font-size:9px; height:18px}
+.devpop .stico{display:block}
+.devpop .pbtn.more{justify-self:start; border:0; background:none; padding:0; color:var(--glass); font-size:10px}
+.devpop .dvicons{display:inline-flex; gap:1px; margin-left:auto}
+.devpop .icobtn{border:0; background:none; color:var(--ink3); padding:2px 3px; border-radius:3px; cursor:pointer; line-height:0}
+.devpop .icobtn:hover{background:var(--rule2); color:var(--ink)}
+.devpop .icobtn.on{color:var(--glass)}
+.devpop .namerow{flex-wrap:nowrap}
+.devpop .dvname.small{width:11.5em; font-weight:500}
+.devpop select.dvpick{font:inherit; font-weight:600; color:var(--ink2); max-width:13em; border:1px solid transparent; background:none; padding:0 2px; cursor:pointer}
+.devpop select.dvpick:hover{border-color:var(--rule2)}
+.devpop .namerow select.dvpick{font-weight:500; max-width:11.5em}
+.view .v3dbar .livebar{margin:7px -10px -7px; border-top:1px solid var(--rule2); border-bottom:0}
+.nosol b{color:#C0442B}
+.recsub{font-weight:400; color:var(--ink3); font-size:.9em}
+.devpop .chips{justify-content:flex-start}
+/* live optimization, along the top of every view while it is on */
+.livebar{contain:inline-size; display:flex; flex-wrap:nowrap; align-items:center; justify-content:space-between; gap:8px; padding:4px 10px; white-space:nowrap; overflow-x:auto; background:color-mix(in srgb, var(--sun) 12%, var(--panel)); border-bottom:1px solid var(--rule2); font-size:11.5px}
+.livebar .liveset{display:flex; flex-wrap:nowrap; align-items:center; gap:8px; min-width:0}
+.livebar .recn{display:inline-flex; align-items:center; gap:6px}
+.livebar .recn input{width:72px; margin:0}
+.livebar .recn output{min-width:1.2em}
+.livebar .liveoff{flex:none; padding:2px 8px}
+.livebar .livenosol{font-weight:600; color:#C0442B}
+.livebar .barchk{display:inline-flex; align-items:center; gap:3px}
+.livebar .livekind, .livebar .livesrc{font-size:11.5px; width:auto !important; flex:none; max-width:9.5em; margin:0; padding:2px 4px}
+.livebar .livesrc{font-weight:600; max-width:11em}
+.livebar .livecmp{padding:2px 8px; flex:none}
+.livebar .livecmp.on{background:#7A5CB8; border-color:#7A5CB8; color:#fff}
+.livebar .livenote{color:var(--ink2); overflow:hidden; text-overflow:ellipsis}
+.ctxmenu .livename{font:inherit; font-size:12px; margin:0 4px 4px; padding:3px 5px; min-width:250px}
+.idlive.on{background:var(--sun); color:#fff; border-color:var(--sun)}
+.devpop .dvsec{margin-top:3px; padding-top:4px; border-top:1px solid var(--rule2); color:var(--ink3); font-weight:600}
+.devpop .dvmore{display:grid; gap:3px; border-top:1px solid var(--rule2); padding-top:4px}
+.devpop .chips{gap:3px}
+.devpop .chip{display:inline-flex; border:1px solid var(--rule); border-radius:3px; overflow:hidden}
+.devpop .chip.on{border-color:var(--glass)}
+.devpop .chip .pbtn{border:0; border-radius:0}
+.devpop .chip .chipx{color:var(--ink3); padding:1px 5px}
+.devpop .chip .chipx:hover{color:#C0442B}
+.barchk{display:inline-flex; align-items:center; gap:4px; font-size:12px; color:var(--ink2); white-space:nowrap; cursor:pointer}
+.barchk input{margin:0}
+/* the site view's layers, in groups */
+.laygrp{border-top:1px solid var(--rule2); padding:4px 0 2px}
+.laygrp:first-child{border-top:0}
+.layhd{display:flex; justify-content:space-between; align-items:center; gap:10px}
+.laylab{font-size:11px; color:var(--ink3)}
+.layitem{padding-left:18px}
+.laygrp.off .layitem,.laygrp.off .laylab{opacity:.45; pointer-events:none}
+/* the settings a drawing has no handle for, folded away */
+details.more{margin:4px 0 8px; border-top:1px solid var(--rule2)}
+details.more>summary{cursor:pointer; font-size:12px; color:var(--ink2); padding:5px 0; list-style:none}
+details.more>summary::before{content:"+ "; font-family:var(--mono); color:var(--ink3)}
+details.more[open]>summary::before{content:"– "}
+.v3dhost.placing, .v3dhost.placing *{cursor:crosshair !important}
+body.placedrag, body.placedrag *{cursor:copy !important; user-select:none}
+/* a small menu at the pointer: a massing's instance menu, or copy-or-instance */
+.ctxmenu{position:absolute; z-index:95; background:var(--panel); border:1px solid var(--rule); box-shadow:0 6px 18px rgba(0,0,0,.16);
+  padding:6px; display:flex; flex-direction:column; gap:3px; min-width:190px; font-size:12.5px}
+.ctxmenu p{margin:2px 4px 4px; font-size:11px; color:var(--ink3); text-transform:uppercase; letter-spacing:.06em}
+.ctxmenu button{text-align:left; border:1px solid transparent; background:none; padding:5px 8px; font-size:12.5px; color:var(--ink); cursor:pointer; border-radius:2px}
+.ctxmenu button:hover:not(:disabled){border-color:var(--glass); background:var(--glasssoft)}
+.ctxmenu button:disabled{color:var(--ink3); cursor:default}
+.ctxmenu .chk{padding:4px 8px; margin:0}
+/* an ideal solution is not the design: dashed, and tagged */
+.reccard.ideal .recsvg{border-style:dashed; border-color:var(--ink3)}
+.idealtag{display:inline-block; font-family:var(--mono); font-size:10px; font-weight:500; text-transform:uppercase; letter-spacing:.06em;
+  color:var(--glass); border:1px solid var(--glass); border-radius:2px; padding:0 4px; margin-right:4px; vertical-align:1px}
+.recsvg.bylaw{border-style:dashed; border-color:var(--ink3)}
+.idealuse{font-size:11.5px}
+.idealname{width:15em}
+.charthost{padding:4px 8px}
+.charthost .vwait{font-size:12.5px; color:var(--ink3); padding:20px 12px}
+.charthost>svg{cursor:crosshair}
+.field{padding-bottom:var(--dockVis, 0px)}
+.view.full{bottom:var(--dockVis, 0px)}
+.recnote{font-size:12.5px; color:var(--ink2); margin:0 0 10px; max-width:95ch}
+.recgrid{display:grid; grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); gap:14px 24px; margin-bottom:10px}
+.reccard h4{font-size:13px; margin:0 0 6px; font-weight:600}
+.recsvg{width:100%; max-width:420px; height:auto; display:block; background:var(--panel); border:1px solid var(--rule2); margin-bottom:8px}
+.recsvg.bylaw{width:auto; height:300px; max-width:100%}
+.step .charts{padding:6px 24px 0}
+
+/* ---------- regulations and references, out of the way ---------- */
+.refs{border-bottom:1px solid var(--rule)}
+.refs>summary{font-family:var(--cond); font-weight:600; font-size:16px; padding:16px 24px; cursor:pointer; list-style:none; color:var(--ink2)}
+.refs>summary::-webkit-details-marker{display:none}
+.refs>summary::before{content:"+ "; font-family:var(--mono); color:var(--ink3)}
+.refs[open]>summary::before{content:"– "}
+.refs>section{border-bottom:0; border-top:1px solid var(--rule2)}
+.regsctl{background:var(--panel); border:1px solid var(--rule2); padding:10px 14px 2px; margin:0 0 16px; max-width:760px}
+.regsgrid{display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:0 18px}
+
+@media (max-width:1040px){
+  .shell{grid-template-columns:1fr}
+  .rail{position:static; max-height:none; border-right:0; border-bottom:1px solid var(--rule)}
+  .sheet{grid-template-columns:1fr}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+
+/* a window broken from its array */
+.brk{font-size:12px; color:var(--ink2); background:var(--glasssoft); border-left:3px solid var(--sun); padding:7px 9px; margin:4px 0 8px}
+
+/* ---------- the calculation settings bar: stays at the top as the page scrolls ---------- */
+.calcbar{position:sticky; top:0; z-index:30; display:flex; flex-wrap:wrap; align-items:center; gap:8px 16px;
+  padding:8px 18px; background:var(--panel); border-bottom:1px solid var(--rule); box-shadow:0 2px 6px rgba(0,0,0,.05)}
+.calcbar .cbtitle{font-family:var(--cond); font-weight:600; font-size:14px; color:var(--ink)}
+.calcbar .seg.mini{margin:0}
+.calcbar .seg.mini button{min-width:0; padding:3px 8px}
+.calcbar .cbhint{flex-basis:100%; margin:0; font-size:11px}
+.tset{position:relative; display:inline-flex; align-items:center; gap:8px}
+.tbtn .arr{display:inline-block; transition:transform .15s}
+.tbtn[aria-expanded=true] .arr{transform:rotate(90deg)}
+.tsum{font-family:var(--mono); font-size:11.5px; color:var(--ink2)}
+.tmenu{position:absolute; top:calc(100% + 6px); left:0; width:300px; background:var(--panel); border:1px solid var(--rule);
+  box-shadow:0 6px 18px rgba(0,0,0,.12); padding:10px 12px 12px; z-index:40}
+.tmenu[hidden]{display:none}
+
+/* ---------- a view minimised to its bar, or filling the screen ---------- */
+.vbtns{margin-left:auto; display:inline-flex; gap:4px}
+.vb{min-width:26px; padding:2px 6px; font-size:13px; line-height:1}
+.view.min>:not(.v3dbar){display:none}
+.view.full{position:fixed; top:var(--fullT, 0px); left:var(--fullL, 0px); right:0; bottom:0; z-index:25; background:var(--panel);
+  border-left:1px solid var(--rule); overflow:hidden}
+.view.full .v3dbar{position:static}
+.view.full .v3dhost,.view.full #sunHost{flex:1; min-height:0; padding:6px 8px}
+.view.full svg{width:100%; height:100%; display:block}
+.view.full .tblock,.view.full [id$=Title]{display:none}
+/* a view's bar stays on screen, under the calculation settings, until the drawing scrolls past */
+.view>.v3dbar{position:sticky; top:var(--cbh, 0px); background:var(--panel); z-index:6}
+body.hasfull{overflow:hidden}
+
+/* ---------- the results, below every drawing ---------- */
+.results{padding:10px 22px 24px; border-top:1px solid var(--rule)}
+.reshd h2{font-family:var(--cond); font-size:22px; margin:10px 0 2px}
+.reshd p{margin:0 0 12px; font-size:12px; color:var(--ink3); font-family:var(--mono)}
+.resgrp{margin:0 0 20px}
+.resgrp>h3{display:flex; align-items:center; gap:8px; font-family:var(--cond); font-size:16px; margin:14px 0 8px}
+.resnote{font-size:12.5px; color:var(--ink2); max-width:90ch; margin:0 0 10px}
+#shadeCharts{margin-top:14px}
+
+/* the sun's angles and the cuts in a view's bar, typed into by a click */
+.barvals{display:inline-flex; gap:10px; align-items:baseline; font-size:11.5px; color:var(--ink3)}
+.barval .val{font-family:var(--mono); font-size:11.5px; color:var(--ink); cursor:text; border-bottom:1px dotted var(--rule); padding-bottom:1px}
+.barval .val:hover,.barval .val:focus{border-bottom-color:var(--glass); outline:none}
+.barval .valbox{width:7ch}
+
+/* figures typed over in a drawing, and names scrubbed in a bar */
+.view svg .editable{cursor:text}
+/* an angle in the building view: its bare symbol at rest; hovered, or its figure hovered on the foot line, its value and working */
+.view svg .ang .anglab{opacity:0; transition:opacity .12s}
+.view svg .ang:hover .anglab, .view svg .ang.hl .anglab{opacity:1}
+.view svg .ang .angsym{transition:opacity .12s}
+.view svg .ang:hover .angsym, .view svg .ang.hl .angsym{opacity:0}
+.view svg .ang:hover > path:not(.hit), .view svg .ang.hl > path:not(.hit), .view svg .ang:hover > polygon, .view svg .ang.hl > polygon{stroke-width:2.6px}
+.tblock .m.ed:hover b.scrub, .tblock .m.ed:hover .val{color:var(--sun)}
+.floatedit{position:absolute; z-index:80; font-family:var(--mono); font-size:12px; padding:1px 4px; border:1px solid var(--glass);
+  border-radius:2px; background:var(--panel); color:var(--ink); box-shadow:0 2px 8px rgba(0,0,0,.15)}
+.scrub{cursor:ew-resize; border-bottom:1px dashed var(--rule); user-select:none; touch-action:none}
+.scrub:hover{color:var(--ink)}
+body.scrubbing, body.scrubbing *{cursor:ew-resize !important; user-select:none}
+.view.full .v3dhost>svg{max-width:none !important; margin:0}
+
+/* ---------- the views in rows, and moving them ---------- */
+.views{display:flex; flex-direction:column; background:#fff; position:relative}
+.vrow{display:flex; align-items:stretch; background:#fff}
+.vrow>.view{flex:1 1 0; min-width:220px}
+.view .v3dhost>svg,.view #sunHost>svg{width:100%; height:auto; display:block}
+.grip{cursor:grab; color:var(--ink3); font-size:15px; line-height:1; padding:0 2px; user-select:none; touch-action:none}
+.grip:hover{color:var(--ink)}
+body.moving, body.moving *{cursor:grabbing !important; user-select:none}
+.view.dragging{opacity:.45}
+.droptarget{position:absolute; z-index:70; pointer-events:none; background:var(--glass); opacity:.35; border-radius:2px}
+.droptarget.swap{background:none; border:2px dashed var(--glass); opacity:.9}
+.info{width:20px; height:20px; border-radius:50%; border:1px solid var(--ink3); background:var(--panel); color:var(--ink2);
+  font-family:Georgia, serif; font-style:italic; font-weight:700; font-size:12px; line-height:1; padding:0; cursor:pointer}
+.info:hover,.info[aria-expanded=true]{border-color:var(--glass); color:var(--glass)}
+.infopop{position:absolute; top:calc(100% + 4px); right:10px; width:min(380px, 90%); z-index:45; background:var(--panel);
+  border:1px solid var(--rule); box-shadow:0 6px 18px rgba(0,0,0,.12); padding:10px 13px; font-size:12.5px; color:var(--ink2)}
+.infopop h4{margin:0 0 6px; font-family:var(--cond); font-size:14px; color:var(--ink)}
+.infopop p{margin:0 0 7px}
+.infopop[hidden]{display:none}
+.keylist{list-style:none; margin:0 0 8px; padding:0; display:grid; gap:4px}
+.keylist li{display:flex; align-items:center; gap:8px}
+.keylist .key{flex:none; width:18px; height:10px; border:1px solid var(--rule); box-sizing:border-box}
+.clocksel{font-size:12px; padding:2px 4px; width:auto !important; flex:none}
+.tset{flex:none; white-space:nowrap}
+.tset>.barval,.tset>.tbtn{flex:none; white-space:nowrap}
+.tset .barval{font-size:11.5px; color:var(--ink3)}
+.libpick{display:flex; gap:6px; align-items:center}
+.wpick{display:inline-flex; gap:6px; align-items:center}
+.winSel{font-size:12px; padding:2px 4px; max-width:14em}
+.view.pinned .winSel{color:var(--glass); border-color:var(--glass)}
+.vname{font-size:12px; padding:2px 6px; width:14em}
+.view.pinned>.v3dbar{box-shadow:inset 3px 0 0 var(--glass)}
+.libpick select[data-k]{flex:1 1 auto; min-width:0}
+.newsel{flex:none; width:auto !important; max-width:9.5em; font-size:12px; color:var(--glass)}
+.view select.addShd{max-width:none}
+.liblist{list-style:none; margin:0 0 6px; padding:0; display:grid; gap:2px; font-size:12px}
+.liblist li{display:flex; gap:8px; align-items:baseline}
+.liblist .libname{flex:1 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--ink)}
+.liblist .libuse{flex:none; font-family:var(--mono); font-size:11px; color:var(--ink3)}
+.angsel{display:flex; flex-direction:column; gap:3px; margin-top:8px; padding-top:8px; border-top:1px solid var(--rule)}
+
+/* ---------- margins between the views: dragged to resize, a + to add a view ---------- */
+.vdiv{flex:0 0 7px; position:relative; background:#fff; cursor:col-resize}
+.hdiv{height:7px; position:relative; background:#fff; cursor:row-resize}
+.vdiv.end,.hdiv.end{cursor:default}
+.vdiv:not(.end):hover,.hdiv:not(.end):hover,body.sizingc .vdiv:hover,body.sizingr .hdiv:hover{background:var(--glasssoft)}
+.vplus{position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); width:22px; height:22px; border-radius:50%;
+  border:1px solid var(--glass); background:var(--panel); color:var(--glass); font-size:15px; line-height:1; padding:0;
+  cursor:pointer; opacity:0; transition:opacity .12s; z-index:8; box-shadow:0 1px 4px rgba(0,0,0,.12)}
+.vdiv:hover>.vplus,.hdiv:hover>.vplus{opacity:1}
+.vdiv>.vplus{top:50%}
+.views.empty .hdiv{height:90px}
+.views.empty .hdiv>.vplus{opacity:1; width:auto; height:auto; border-radius:3px; padding:6px 12px; font-size:13px}
+.views.empty .hdiv>.vplus::after{content:' Add a view'}
+body.sizingc, body.sizingc *{cursor:col-resize !important; user-select:none}
+body.sizingr, body.sizingr *{cursor:row-resize !important; user-select:none}
+.vmenu{position:absolute; z-index:90; transform:translateX(-50%); background:var(--panel); border:1px solid var(--rule);
+  box-shadow:0 6px 18px rgba(0,0,0,.14); padding:6px; display:flex; flex-direction:column; gap:3px; min-width:160px}
+.vmenu p{margin:2px 4px 4px; font-size:11px; color:var(--ink3); text-transform:uppercase; letter-spacing:.06em}
+.vmenu button{text-align:left; border:1px solid transparent; background:none; padding:5px 8px; font-size:12.5px; color:var(--ink); cursor:pointer; border-radius:2px}
+.vmenu button:hover{border-color:var(--glass); background:var(--glasssoft)}
+.vtype{width:auto; margin:0; padding:2px 4px; font-size:12px; font-family:var(--cond); font-weight:600; border-color:transparent; background:transparent}
+.vtype:hover{border-color:var(--rule)}
+
+/* ---------- the panel and the settings bar tuck away ---------- */
+.tuck{border:1px solid var(--rule); background:var(--panel); color:var(--ink2); border-radius:2px; cursor:pointer; font-size:12px; padding:1px 7px; line-height:1.3}
+.tuck:hover{border-color:var(--glass); color:var(--ink)}
+.railtuck{position:sticky; top:4px; float:right; margin:6px 8px 0 0; z-index:5}
+body.railtucked .shell{grid-template-columns:30px minmax(0,1fr)}
+body.railtucked .rail>:not(.railtuck){display:none}
+body.railtucked .railtuck{float:none; margin:6px auto; display:block}
+body.bartucked .calcbar>:not(.tuck):not(.cbtitle):not(.gainrow):not(.playbtn){display:none}
+/* Play day: the one control everyone looks for, in the settings bar and never tucked away */
+.playbtn{font-family:var(--sans); font-weight:600; font-size:13px; padding:4px 14px; border-radius:16px; border:1px solid var(--sun);
+  background:var(--sun); color:#fff; cursor:pointer; white-space:nowrap; flex:none; box-shadow:0 1px 3px rgba(0,0,0,.15)}
+.playbtn:hover{filter:brightness(1.06)}
+.playbtn.on{background:var(--panel); color:var(--sun)}
+body.bartucked .calcbar{padding:4px 18px}
+
+/* a name or button with an explanation behind it: hover to read */
+.tipped{cursor:help; border-bottom:1px dotted var(--ink3)}
+label.tipped{display:inline}
+.linkbtn{border:0 !important; background:none !important; color:var(--glass) !important; text-decoration:underline; padding:0 2px !important; min-width:0 !important; font-size:11.5px !important}
+.wxdots[hidden]{display:none}
+/* a layer's or a group's opacity on the Layers menu: dragged sideways, or typed */
+.layrow{display:flex; align-items:center; justify-content:space-between; gap:8px}
+.opv{font-size:11px; color:var(--ink3); cursor:ew-resize; border-bottom:1px dotted var(--rule); min-width:3.2em; text-align:right; user-select:none}
+.opv:hover{color:var(--ink)}
+.opv input{font:inherit; width:3.2em; padding:0 2px; margin:0; text-align:right}
+.laygrp.off .opv{opacity:.45; pointer-events:none}
+/* a device's depth snapped to the one that just shades the window now */
+/* a window isolated in the building view: the view outlined while the building's own handles are put away */
+.view.iso .vhost{outline:2px dashed var(--glass); outline-offset:-4px}
+.vhost[data-snap]::after{content:attr(data-snap); position:absolute; left:10px; bottom:10px; padding:2px 6px; font:11px var(--mono); color:var(--panel); background:var(--sun); border-radius:3px; pointer-events:none; z-index:5}
+
+/* the guide: a note beside the part of the page it is about, that part ringed */
+.guideDD{position:relative; display:inline-block}
+.guideDD > summary{list-style:none; cursor:pointer}
+.guideDD > summary::-webkit-details-marker{display:none}
+.guideDD .ddmenu{position:absolute; right:0; top:calc(100% + 4px); z-index:90; display:grid; gap:6px; padding:8px; background:var(--panel); border:1px solid var(--rule); border-radius:6px; box-shadow:0 6px 18px rgba(0,0,0,.14); min-width:15em}
+.guideDD .ddmenu .minibtn{text-align:left; white-space:nowrap}
+.tour{position:fixed; z-index:200; width:min(360px, calc(100vw - 16px)); background:var(--panel); border:1px solid var(--glass); border-radius:8px; box-shadow:0 10px 30px rgba(0,0,0,.22); font-size:12.5px; line-height:1.45}
+.tourhd{display:flex; align-items:center; gap:8px; padding:8px 10px 4px}
+.tourhd b{flex:1; font-size:13px}
+.tourn{color:var(--ink3); font:11px var(--mono)}
+.tourhd button{border:0; background:none; font-size:16px; line-height:1; cursor:pointer; color:var(--ink2); padding:0 2px}
+.tourbody{padding:0 12px}
+.tourbody p{margin:6px 0}
+.tourbtns{display:flex; align-items:center; gap:6px; padding:8px 10px 10px}
+.tourgap{flex:1}
+.tourdo{background:color-mix(in srgb, var(--sun) 16%, var(--panel))}
+.tourring{position:fixed; z-index:199; pointer-events:none; border:2px solid var(--glass); border-radius:8px; box-shadow:0 0 0 4px color-mix(in srgb, var(--glass) 18%, transparent); transition:all .2s}

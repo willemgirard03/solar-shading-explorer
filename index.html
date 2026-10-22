@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vancouver Solar Shading Explorer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Condensed:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<header class="masthead">
+  <div>
+    <h1>Vancouver Solar Shading Explorer</h1>
+    <p class="sub">Shape a shading device and watch what it does: the sun angles, the profile angle it cuts off, where the beam lands inside, and how much solar heat comes through the glass.</p>
+  </div>
+  <div class="chips">
+    <span class="chip">49.19&deg;N 123.18&deg;W &middot; <b>Vancouver</b></span>
+    <span class="chip">UTC<b>&minus;8</b></span>
+    <details class="dd guideDD"><summary class="chip hbtn" title="A walk round the tool, or a worked example done step by step in it">Guide</summary><div class="ddmenu">
+      <button type="button" class="minibtn" data-guide="tour" title="What each part of the page is for, and how its drawings are worked">How to use the tool</button>
+      <button type="button" class="minibtn" data-guide="example" title="An overhang sized for one moment by hand-method steps, then checked over the day and against the climate - the page set up for each step">Worked example: size an overhang</button>
+    </div></details>
+    <button type="button" class="chip hbtn" id="undoBtn" disabled>&#x21b6; Undo</button>
+    <button type="button" class="chip hbtn" id="redoBtn" disabled>Redo &#x21b7;</button>
+  </div>
+</header>
+
+<div class="shell">
+  <aside class="rail ctlzone" id="rail"></aside>
+  <main class="field">
+
+    <div class="calcbar ctlzone" id="calcBar"></div>
+
+    <!-- the drawings, in rows: dragged by the grip in a view's bar, a view moves to a new row or a new column -->
+    <section class="views" id="views"></section>
+    <div class="droptarget" id="dropTarget" hidden></div>
+
+    <!-- the code checks, for the whole building, under the drawings -->
+    <section class="results checksec adv" id="checksSec">
+      <div class="resgrp"><h3>Code checks</h3><div class="calc"><div class="rules" id="checks"></div></div></div>
+    </section>
+
+    <!-- the design recommendations, docked at the foot of the drawings: resized by their top edge, collapsed or full screen -->
+    <section class="dock" id="dock" aria-label="Calculations">
+      <div class="dockgrip" id="dockGrip" title="Drag to resize"></div>
+      <div class="dockbar">
+        <span class="docktitle"><span class="tipped" title="The working behind what the views show, for the selected window at the date and time set: the sun's angles and how each is found, the ideal shading sized by hand - the same members Live shading puts on the window - and how far the by-law lets a device project.">Calculations</span></span>
+        <span class="dockfor" id="dockFor"></span>
+        <span class="vbtns"><button type="button" class="minibtn vb" id="dockMin" title="Collapse">▾</button><button type="button" class="minibtn vb" id="dockFull" title="Full screen" aria-label="Full screen"><svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true"><path d="M3.5 12.5l9-9" stroke="currentColor" stroke-width="1.4"/><path d="M8.5 2.5h5v5M2.5 8.5v5h5" fill="none" stroke="currentColor" stroke-width="1.4"/></svg></button></span>
+      </div>
+      <div class="dockbody" id="dockBody">
+    <!-- for the selected window's face, at this instant: where to start -->
+    <section class="results recs" id="recs">
+      <div class="resgrp"><h3>Ideal shading at this instant</h3><div class="calc" id="rec2"></div></div>
+      <div class="resgrp adv"><h3><span class="tipped" title="VBBL 1.8.9: how far a solar shading device may project past the property line into a street, by its height above the street and the street's width - read against the site boundary under Site Parameters">By-law: projection past the property line</span></h3><div class="calc" id="rec3"></div></div>
+    </section>
+      </div>
+    </section>
+
+    <details class="refs" id="refs">
+      <summary>Climate, Method and Sources</summary>
+      <section id="secEnergy">
+        <h2>Climate context</h2>
+        <div id="energyIntro"></div>
+        <div class="rules adv" id="energyRules"></div>
+      </section>
+      <section id="secMethod">
+        <h2>Assumptions and methodology</h2>
+        <div id="method"></div>
+      </section>
+      <section id="secSources">
+        <h2>Source register</h2>
+        <div id="sources"></div>
+      </section>
+    </details>
+
+    <footer>
+      A teaching tool for solar geometry and shading design. Direct beam only, on an isolated block in Vancouver; not a daylighting tool, not an energy model, and not permit software.
+    </footer>
+  </main>
+</div>
+<script type="module" src="src/main.js"></script>
+</body>
+</html>
