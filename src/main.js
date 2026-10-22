@@ -58,7 +58,8 @@ import { exportRhino } from './export/rhino.js';
 
 const $ = id => document.getElementById(id);
 const clampN = (x, a, b) => Math.min(b, Math.max(a, x));
-// the page starts on the default template - a window in the middle of each side - on solar time, in the mode last used: Simple at first
+// the page starts on the default template - a 10 m square storey, a window in the middle of each side - on solar time, in the mode last used: Simple at first
+S.storeys[0].w = 10; S.storeys[0].d = 10;
 windowEachSide(S);
 const MODE_KEY = 'solar-shading-mode-v9';
 try { S.mode = localStorage.getItem(MODE_KEY) === 'advanced' ? 'advanced' : 'simple'; } catch (_) { S.mode = 'simple'; }
@@ -286,7 +287,7 @@ function devPop(inst, F) {
   // a bare side has no window for the frame to carry the pick on: the pick itself says so
   // isolated in the building view, the window's own small window stays - a device picked from it is pulled there
   // Simple edits the selected window in the building view where it stands, as Advanced does once it is isolated
-  const isoOn = inst.type === 'axon' && (!!inst.V.iso || (S.mode === 'simple' && (S.pick === 'window' || S.pick === 'device')));
+  const isoOn = inst.type === 'axon' && (!!inst.V.iso || (S.mode === 'simple' && S.sel.unit !== null && (S.pick === 'window' || S.pick === 'device')));
   const P = inst.h.pop, has = !!selCell(), isWin = !!(P && (P.kind === 'window' || P.kind === 'wall') && (F.pick === 'window' || (isoOn && !F.selD) || (!has && S.pick === 'window')));
   if (!(P && (isWin || F.selD) && POP.st !== 'closed')) { hideWidget(POP); return; }
   const min = POP.st === 'min';
@@ -845,15 +846,44 @@ document.addEventListener('click', e => {
   const g = e.target.closest && e.target.closest('[data-modego]');
   if (g) { const how = g.dataset.modego; closePop(); if (how && modeTo) enterMode(modeTo, how); }
 });
+/* A view taken off the page is kept, with where it stood, so Undo puts it back
+   - itself, its camera and all - and Redo takes it off again. */
+const viewUndo = [], viewRedo = [];
+function takeView(v, redoing = false) {
+  const row = v.parentElement, nextView = (() => { let n = v.nextElementSibling; while (n && !n.classList.contains('view')) n = n.nextElementSibling; return n; })();
+  let nextRow = row && row.nextElementSibling; while (nextRow && !nextRow.classList.contains('vrow')) nextRow = nextRow.nextElementSibling;
+  viewUndo.push({ el: v, row, nextView, nextRow, host: row && row.parentElement, at: H.undo.length });
+  if (!redoing) viewRedo.length = 0;
+  removeView(v); H.onChange();
+}
+function putView(o) {
+  if (o.row && !o.row.isConnected) o.host.insertBefore(o.row, o.nextRow && o.nextRow.isConnected ? o.nextRow : null);
+  o.row.insertBefore(o.el, o.nextView && o.nextView.parentElement === o.row ? o.nextView : null);
+  viewRedo.push({ el: o.el, at: o.at });
+  margins(); saveLayout(); H.onChange(); clearSunCache(); schedule();
+}
 function wireHistory() {
   const u = $('undoBtn'), r = $('redoBtn');
   H.onChange = () => {
-    u.disabled = !H.undo.length; r.disabled = !H.redo.length;
+    u.disabled = !H.undo.length && !viewUndo.length; r.disabled = !H.redo.length && !viewRedo.length;
     u.title = 'Undo the last edit (Ctrl+Z) · ' + H.undo.length + ' to go back through';
     r.title = 'Redo (Ctrl+Shift+Z) · ' + H.redo.length + ' to come forward through';
   };
-  const back = () => { stopPlay(); if (H.back()) afterRestore(); };
-  const fwd = () => { stopPlay(); if (H.forward()) afterRestore(); };
+  // a view taken off is undone in its turn among the edits: it went after the edits before it
+  const back = () => {
+    stopPlay();
+    const last = viewUndo[viewUndo.length - 1];
+    if (last && last.at >= H.undo.length) { putView(viewUndo.pop()); return; }
+    if (H.back()) afterRestore();
+  };
+  const fwd = () => {
+    stopPlay();
+    const nx = viewRedo[viewRedo.length - 1];
+    if (nx && nx.at === H.undo.length) { takeView(viewRedo.pop().el, true); return; }
+    if (H.forward()) afterRestore();
+  };
+  const mark0 = H.mark;
+  H.mark = (...a) => { viewRedo.length = 0; return mark0(...a); };
   u.addEventListener('click', back);
   r.addEventListener('click', fwd);
   // a drag holds its run open, and letting go closes it: one drag, one step
@@ -993,8 +1023,11 @@ const ACTS = {
   // shading added from the window's small window: on a plan or a section the new device is picked, to shape there
   addShading: v => {
     H.mark('device');
+    const h0 = selShading(S), n0 = h0 ? h0.devices.length : 0;
     if (!addShading(v)) return;
-    if (POP.at && (POP.at.type === 'section' || POP.at.type === 'plan')) { const r = selCell(); ACTS.pickDev(r ? r.dev || 0 : 0); }
+    const h1 = selShading(S), n1 = h1 ? h1.devices.length : 0;
+    // one device added - a blade, a fin, a one-member preset - is picked and its pop-over opened; so is anything added on a plan or a section
+    if (n1 - n0 === 1 || (POP.at && (POP.at.type === 'section' || POP.at.type === 'plan'))) { const r = selCell(); ACTS.pickDev(r ? r.dev || 0 : 0); }
   },
   pickDev: a => {
     // isolated in the building view, the device is picked there, to pull its depth by its tip
@@ -1303,7 +1336,7 @@ document.addEventListener('click', e => {
   if (b.dataset.vfull !== undefined) { setFull(v, !v.classList.contains('full')); return; }
   // taken off the page: the rest of its row closes up; a + in any margin brings a view back
   if (v.classList.contains('full')) setFull(v, false);
-  removeView(v); clearSunCache(); schedule();
+  takeView(v); clearSunCache(); schedule();
 });
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape' && document.querySelector('.view.full')) setFull(null, false);

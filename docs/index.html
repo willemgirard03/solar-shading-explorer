@@ -582,7 +582,12 @@ body.hasfull{overflow:hidden}
 /* figures typed over in a drawing, and names scrubbed in a bar */
 .view svg .editable{cursor:text}
 /* an angle in the building view: its bare symbol at rest; hovered, or its figure hovered on the foot line, its value and working */
-.view svg .ang .anglab{opacity:0; transition:opacity .12s}
+/* full screen, the view is its own scroller: the camera's buttons sit at the drawing's top, under its bar */
+.view.full .vfloat.vfTR{top:calc(var(--vbh, 38px) + 6px)}
+/* an angle's name and working take no pointer until its construction is hovered: hidden, it never stands over a handle */
+.view svg .ang .anglab{opacity:0; transition:opacity .12s; pointer-events:none}
+.view svg .ang polygon{pointer-events:none}
+.view svg .ang:hover .anglab{pointer-events:auto}
 .view svg .ang:hover .anglab, .view svg .ang.hl .anglab{opacity:1}
 .view svg .ang .angsym{transition:opacity .12s}
 .view svg .ang:hover .angsym, .view svg .ang.hl .angsym{opacity:0}
@@ -3758,7 +3763,7 @@ label.tipped{display:inline}
     ctxSel: null
   };
   var TYPOLOGIES = {
-    blank: { label: "Default", sub: "one storey, a window each side", about: "A single 3.6 m storey on a 30 \xD7 18 m floorplate, a 1.5 \xD7 1.8 m window in the middle of each side and no shading: build it up yourself.", each: true, plnW: 30, plnD: 18, runs: [[1, 3.6, 0.3, null]], st: 0 },
+    blank: { label: "Default", sub: "one storey, a window each side", about: "A single 3.6 m storey on a 10 \xD7 10 m floorplate, a 1.5 \xD7 1.8 m window in the middle of each side and no shading: build it up yourself.", each: true, plnW: 10, plnD: 10, runs: [[1, 3.6, 0.3, null]], st: 0 },
     officeTower: {
       label: "Glazed office tower",
       sub: "curtain wall \xB7 20 storeys",
@@ -4138,7 +4143,7 @@ label.tipped{display:inline}
       s += L(ox + 6 * ux, oy + 6 * uy, tx - 6 * ux, ty - 6 * uy, { stroke: c, w: 1.8 });
       s += POLY([[tx, ty], [tx - 10 * ux - 5 * uy, ty - 10 * uy + 5 * ux], [tx - 10 * ux + 5 * uy, ty - 10 * uy - 5 * ux]], { fill: c, stroke: c, w: 0.8 });
       const sgn = Math.sign(ux * a.dir[0] + uy * a.dir[1]) || 1;
-      grips.push({ p: [tx - 4 * ux, ty - 4 * uy], key: a.key, from: a.from, dir: a.dir, arrow: true, sgn });
+      grips.push({ p: [tx - 4 * ux, ty - 4 * uy], o: [ox, oy], key: a.key, from: a.from, dir: a.dir, arrow: true, sgn });
     });
     grips.push({ p: [ox, oy], pop: true });
     return s + CIRCLE(ox, oy, 5.5, { fill: "var(--panel)", stroke: "var(--ink2)", "stroke-width": 1.4 }) + CIRCLE(ox, oy, 1.8, { fill: "var(--ink2)" });
@@ -4253,7 +4258,7 @@ label.tipped{display:inline}
     /** the plan's and the section's handles and typed figures, shown on request */
     edit: false,
     /** where the site view draws its angles: 'ground', the window's 'level', or about the 'window' */
-    angAt: "ground",
+    angAt: "cut",
     /** the device is see-through by default: a solid array stands between the eye
      *  and the sunlit glass, which is the one thing the window view is for */
     detSolid: false,
@@ -7262,10 +7267,10 @@ label.tipped{display:inline}
   var grow2 = (polys) => ({ polys, node: polys.length <= BSP_CAP ? bspBuild(polys) : null });
   var walk = (t, e, flat) => t.node ? bspOrder(t.node, e, []) : paintOrder(t.polys, e, flat).order;
   var scene = { key: "", units: [], lines: [] };
-  function sceneOf(F, cur) {
+  function sceneOf(F, cur, full = "") {
     const { S: S2, B } = F;
     const sun = cur.up ? cur.az.toFixed(3) + "," + cur.alt.toFixed(3) : "-";
-    const key = [(B.context || []).map((b) => [...b.c, b.a, ...b.h].map((x) => x.toFixed(3)).join(",")).join(";"), S2.rot || 0, S2.storeys.map((s) => [s.w, s.d, s.ox || 0, s.oy || 0, s.rot || 0, s.rotRel || "building", s.oxyIn || "own"].join("x")).join(","), sun, ...Object.values(B.facades).flatMap((fc) => fc.rows.map((r) => r.cell ? r.cell.key + (r.units.some((q) => q.broken) ? "#" + r.units.map((q) => q.cid).join(",") + "#" + r.units.filter((q) => q.broken).map((q) => q.cell.key).join("&") : "") : "x" + r.h))].join("|");
+    const key = [(B.context || []).map((b) => [...b.c, b.a, ...b.h].map((x) => x.toFixed(3)).join(",")).join(";"), S2.rot || 0, S2.storeys.map((s) => [s.w, s.d, s.ox || 0, s.oy || 0, s.rot || 0, s.rotRel || "building", s.oxyIn || "own"].join("x")).join(","), sun, ...Object.values(B.facades).flatMap((fc) => fc.rows.map((r) => r.cell ? r.cell.key + (r.units.some((q) => q.broken) ? "#" + r.units.map((q) => q.cid).join(",") + "#" + r.units.filter((q) => q.broken).map((q) => q.cell.key).join("&") : "") : "x" + r.h)), full].join("|");
     if (scene.key === key) return scene;
     const backs = /* @__PURE__ */ new Map(), fronts = /* @__PURE__ */ new Map(), units = [];
     const thin = (els) => {
@@ -7285,7 +7290,8 @@ label.tipped{display:inline}
         const sl = cur.up ? solarAtFacade(cur, r.gf) : null;
         for (const q of r.units) {
           const qc = q.cell;
-          if (!fronts.has(qc.key)) fronts.set(qc.key, grow2(thin(qc.elements).flatMap((b) => boxFaces(b).map((f) => bpoly(f.pts, f.n, "dev", { sys: b.sys })))));
+          const all = !!full && full === fc.f + ":" + r.st + ":" + q.i, fk = qc.key + (all ? "|all" : "");
+          if (!fronts.has(fk)) fronts.set(fk, grow2((all ? qc.elements : thin(qc.elements)).flatMap((b) => boxFaces(b).map((f) => bpoly(f.pts, f.n, "dev", { sys: b.sys })))));
           const c2 = { onFacade: !!sl && sl[2] > 1e-6, sl };
           const bk = unitKey(B, fc.f, r.st, q.i) + "|" + q.r0.toFixed(4) + "," + q.r1.toFixed(4) + "|" + (c2.onFacade ? sl.map((x) => x.toFixed(5)).join(",") : "-");
           const f0 = fc.f, st0 = r.st, i0 = q.i, rect = { u0: q.r0, u1: q.r1, v0: 0, v1: r.h };
@@ -7304,7 +7310,7 @@ label.tipped{display:inline}
             cell: qc,
             broken: q.broken,
             back,
-            front: fronts.get(qc.key)
+            front: fronts.get(fk)
           });
         }
       }
@@ -7591,7 +7597,7 @@ label.tipped{display:inline}
     axonSiteMids = null;
     axonIso = null;
     axonIsoDevs = [];
-    const direct = S2.mode === "simple" && (S2.pick === "window" || S2.pick === "device");
+    const direct = S2.mode === "simple" && S2.sel.unit !== null && (S2.pick === "window" || S2.pick === "device");
     const iso = !!((V2.iso || direct) && F.sel.unit !== null && m.opening);
     let selPr = null, selO = null;
     const Ly = Object.fromEntries(Object.entries(V2.layers).map(([k, on]) => [k, on && (V2.groups || {})[GROUP_OF[k]] !== false]));
@@ -7799,7 +7805,7 @@ label.tipped{display:inline}
       }
     }
     const seen = {}, hits = [];
-    const sc = sceneOf(F, cur);
+    const sc = sceneOf(F, cur, iso ? sel.f + ":" + sel.st + ":" + sel.unit : "");
     const visOf = (f, st) => {
       const W0 = F.B.facades[f].rows[st].frame.W;
       return cam.vis([W0[0], W0[1]]);
@@ -7989,7 +7995,8 @@ label.tipped{display:inline}
           const a = cur.vsa * D2R * i / 20;
           arcp.push(v3.add(O, v3.mul(v3.add(v3.mul(nrm, Math.cos(a)), v3.mul(w0, Math.sin(a))), rad)));
         }
-        g += PATH(arcp.map((p, i) => (i ? "L" : "M") + P(p).map((v) => fmt(v, 2)).join(",")).join(" "), { stroke: "var(--sun)", w: 1 });
+        const thArc = arcp.map((p, i) => (i ? "L" : "M") + P(p).map((v) => fmt(v, 2)).join(",")).join(" ");
+        g += PATH(thArc, { stroke: "var(--sun)", w: 1 }) + hit(thArc);
         const lq = P(v3.add(O, v3.mul(v3.unit(v3.add(nrm, ray)), rad * 1.7)));
         const tb = Math.tan(cur.alt * D2R), cg = Math.cos(cur.gamma * D2R);
         angle(mk, "theta", lq, "\u03B8", "profile angle \u03B8 " + fmt(cur.vsa, 1) + "\xB0", "\u03B8 = tan\u207B\xB9(tan \u03B2 / cos \u03B3) = tan\u207B\xB9(" + fmt(tb, 3) + " / " + fmt(cg, 3) + ")", "var(--sun)", "theta", 10);
@@ -8041,8 +8048,10 @@ label.tipped{display:inline}
       const sq = P(at([0, -1], span * 0.66));
       g += T(sq[0], sq[1] + 3, "S", { anchor: "middle", size: 9, fill: "var(--ink3)" });
       if (Ly.azimuth) layer("azimuth", () => {
-        g += PATH(pth([O, at(dirOf(gf), span * 0.5)]), { stroke: "var(--glass)", w: 1.2 });
-        if (Math.abs(dev) > 0.5) g += PATH(pth(arcG(180, 180 + dev, span * 0.42)), { stroke: "var(--glass)", w: 1.2, marker: "url(#ad)" });
+        const mk = g.length, nArm = pth([O, at(dirOf(gf), span * 0.5)]), sArc = Math.abs(dev) > 0.5 ? pth(arcG(180, 180 + dev, span * 0.42)) : null;
+        g += PATH(nArm, { stroke: "var(--glass)", w: 1.2 }) + hit(nArm);
+        if (sArc) g += PATH(sArc, { stroke: "var(--glass)", w: 1.2, marker: "url(#ad)" }) + hit(sArc);
+        angle(mk, "surfaz", P(at(dirOf(180 + dev / 2), span * 0.47)), "", "surface azimuth " + fmt(dev, 1) + "\xB0", "the facade\u2019s normal, from due south, east \u2212", "var(--glass)", "surfAz", 8.5);
       });
       if (Ly.angles && cur.up) layer("angles", () => {
         const gdir = v3.unit([sv[0], sv[1], 0]);
@@ -8130,7 +8139,7 @@ label.tipped{display:inline}
             if (l < 1e-6) continue;
             const ux = dir[0] / l, uy = dir[1] / l, tx = O[0] + 34 * ux, ty = O[1] + 34 * uy;
             g += L(O[0] + 6 * ux, O[1] + 6 * uy, tx - 6 * ux, ty - 6 * uy, { stroke: col, w: 1.8 }) + POLY([[tx, ty], [tx - 10 * ux - 5 * uy, ty - 10 * uy + 5 * ux], [tx - 10 * ux + 5 * uy, ty - 10 * uy - 5 * ux]], { fill: col, stroke: col, w: 0.8 });
-            grips.push({ p: [tx - 4 * ux, ty - 4 * uy], key, from, dir, arrow: true, sgn: 1 });
+            grips.push({ p: [tx - 4 * ux, ty - 4 * uy], o: O, key, from, dir, arrow: true, sgn: 1 });
           }
           grips.push({ p: O, pop: true });
           g += CIRCLE(O[0], O[1], 5.5, { fill: "var(--panel)", stroke: "var(--ink2)", "stroke-width": 1.4 }) + CIRCLE(O[0], O[1], 1.8, { fill: "var(--ink2)" });
@@ -8152,7 +8161,7 @@ label.tipped{display:inline}
       axonIso = grips;
     }
     axonPlateEdit = null;
-    if (V2.plate && V2.plate.on && !iso) {
+    if (V2.plate && V2.plate.on && !(iso && V2.iso)) {
       const pe = plateEdit(F, sel.st, zbs[sel.st], cam, P);
       g += pe.g;
       axonPlateEdit = pe.edit;
@@ -8870,7 +8879,18 @@ label.tipped{display:inline}
     el.hidden = true;
     document.body.appendChild(el);
     const w = { el, at: null, st: "closed", off: null, anchor: null, stay: !!hooks.stay, html: "", hooks };
+    el.addEventListener("contextmenu", (e) => e.preventDefault());
     el.addEventListener("pointerdown", (e) => {
+      if (e.button === 2 && w.at && w.at.host) {
+        const h = w.at.host;
+        h.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, cancelable: true, clientX: e.clientX, clientY: e.clientY, button: 2, buttons: 2, pointerId: e.pointerId, pointerType: e.pointerType, shiftKey: e.shiftKey, altKey: e.altKey, ctrlKey: e.ctrlKey }));
+        try {
+          h.setPointerCapture(e.pointerId);
+        } catch (_) {
+        }
+        e.preventDefault();
+        return;
+      }
       if (e.button !== 0) return;
       const act = e.target.closest("[data-popact]");
       if (act) {
@@ -10583,7 +10603,7 @@ entering            q \xD7 sunlit glass area \xD7 SHGC   W</div>
         return [p1[0] - p0[0], p1[1] - p0[1]];
       };
       det.addEventListener("pointerdown", (e) => {
-        if (e.target.closest && e.target.closest("[data-edit]")) return;
+        if (e.button === 0 && e.target.closest && e.target.closest("[data-edit]")) return;
         const v = viewPoint(det, e);
         const ds = inst.h.sun;
         if (v && e.button === 0 && ds && Math.hypot(v[0] - ds.knob[0], v[1] - ds.knob[1]) < 12) {
@@ -10716,7 +10736,7 @@ entering            q \xD7 sunlit glass area \xD7 SHGC   W</div>
         const h = hitAt(v);
         return h ? h.i : null;
       };
-      const gripAt = (v) => v && ((inst.h.grips || []).find((g) => !g.line && Math.hypot(v[0] - g.p[0], v[1] - g.p[1]) < 8) || (inst.h.grips || []).find((g) => g.line && segD(v, g.line[0], g.line[1]) < 5));
+      const gripAt = (v) => v && ((inst.h.grips || []).find((g) => !g.line && (Math.hypot(v[0] - g.p[0], v[1] - g.p[1]) < 8 || g.arrow && g.o && segDist(v, g.o, g.p) < 5)) || (inst.h.grips || []).find((g) => g.line && segD(v, g.line[0], g.line[1]) < 5));
       const handle = () => inst.h.handle;
       const onCut = (v) => {
         const c = inst.h.cut;
@@ -10731,7 +10751,7 @@ entering            q \xD7 sunlit glass area \xD7 SHGC   W</div>
         app.paint(inst);
       }, { passive: false });
       host.addEventListener("pointerdown", (e) => {
-        if (e.target.closest && e.target.closest("[data-edit], [data-set]")) return;
+        if (e.button === 0 && e.target.closest && e.target.closest("[data-edit], [data-set]")) return;
         const v = viewPoint(host, e);
         if (!v) return;
         travel = 0;
@@ -11162,7 +11182,7 @@ entering            q \xD7 sunlit glass area \xD7 SHGC   W</div>
     const isoAt = (v) => {
       let best = null, bd = 9;
       for (const g of inst.h.iso || []) {
-        const d = Math.hypot(v[0] - g.p[0], v[1] - g.p[1]) - (g.dev ? 4 : 0);
+        const d = (g.arrow && g.o ? Math.min(Math.hypot(v[0] - g.p[0], v[1] - g.p[1]), segDist(v, g.o, g.p) + 2) : Math.hypot(v[0] - g.p[0], v[1] - g.p[1])) - (g.dev || g.arrow || g.pop ? 4 : 0);
         if (d < bd) {
           bd = d;
           best = g;
@@ -11171,7 +11191,7 @@ entering            q \xD7 sunlit glass area \xD7 SHGC   W</div>
       return best;
     };
     ax.addEventListener("pointerdown", (e) => {
-      if (e.target.closest && e.target.closest("[data-edit]")) return;
+      if (e.button === 0 && e.target.closest && e.target.closest("[data-edit]")) return;
       if (V2.place.on && e.button === 0) {
         const p = groundAt(e);
         if (p) app.placeContext(p);
@@ -11281,6 +11301,10 @@ entering            q \xD7 sunlit glass area \xD7 SHGC   W</div>
         }
       }
       ad = { x: e.clientX, y: e.clientY, x0: e.clientX, y0: e.clientY, v, moved: false, mode: camMode(e) };
+      if (ad.mode === "orbit" && v && inst.h.focus) {
+        const f = inst.h.focus, q = axonCamera(S2, V2.axcam).P(f), c0 = axonCamera(S2, Object.assign({}, V2.axcam, { focus: f, panX: 0, panY: 0 })).P(f);
+        Object.assign(V2.axcam, { focus: f.slice(), panX: q[0] - c0[0], panY: q[1] - c0[1] });
+      }
       if (v && ad.mode === "click" && !V2.iso) {
         const glass = (inst.h.hits || []).filter((h) => h.unit !== null && inside(h.pts, v[0], v[1]));
         const front = glass.length ? glass.reduce((a, b) => b.d > a.d ? b : a) : null;
@@ -11729,6 +11753,8 @@ entering            q \xD7 sunlit glass area \xD7 SHGC   W</div>
   // src/main.js
   var $2 = (id) => document.getElementById(id);
   var clampN3 = (x, a, b) => Math.min(b, Math.max(a, x));
+  S.storeys[0].w = 10;
+  S.storeys[0].d = 10;
   windowEachSide(S);
   var MODE_KEY = "solar-shading-mode-v9";
   try {
@@ -12105,7 +12131,7 @@ entering            q \xD7 sunlit glass area \xD7 SHGC   W</div>
   }
   function devPop(inst, F) {
     if (inst !== POP.at) return;
-    const isoOn = inst.type === "axon" && (!!inst.V.iso || S.mode === "simple" && (S.pick === "window" || S.pick === "device"));
+    const isoOn = inst.type === "axon" && (!!inst.V.iso || S.mode === "simple" && S.sel.unit !== null && (S.pick === "window" || S.pick === "device"));
     const P = inst.h.pop, has = !!selCell(), isWin = !!(P && (P.kind === "window" || P.kind === "wall") && (F.pick === "window" || isoOn && !F.selD || !has && S.pick === "window"));
     if (!(P && (isWin || F.selD) && POP.st !== "closed")) {
       hideWidget(POP);
@@ -12834,21 +12860,61 @@ entering            q \xD7 sunlit glass area \xD7 SHGC   W</div>
       if (how && modeTo) enterMode(modeTo, how);
     }
   });
+  var viewUndo = [];
+  var viewRedo = [];
+  function takeView(v, redoing = false) {
+    const row2 = v.parentElement, nextView = (() => {
+      let n = v.nextElementSibling;
+      while (n && !n.classList.contains("view")) n = n.nextElementSibling;
+      return n;
+    })();
+    let nextRow = row2 && row2.nextElementSibling;
+    while (nextRow && !nextRow.classList.contains("vrow")) nextRow = nextRow.nextElementSibling;
+    viewUndo.push({ el: v, row: row2, nextView, nextRow, host: row2 && row2.parentElement, at: H2.undo.length });
+    if (!redoing) viewRedo.length = 0;
+    removeView(v);
+    H2.onChange();
+  }
+  function putView(o) {
+    if (o.row && !o.row.isConnected) o.host.insertBefore(o.row, o.nextRow && o.nextRow.isConnected ? o.nextRow : null);
+    o.row.insertBefore(o.el, o.nextView && o.nextView.parentElement === o.row ? o.nextView : null);
+    viewRedo.push({ el: o.el, at: o.at });
+    margins();
+    saveLayout();
+    H2.onChange();
+    clearSunCache();
+    schedule();
+  }
   function wireHistory() {
     const u = $2("undoBtn"), r = $2("redoBtn");
     H2.onChange = () => {
-      u.disabled = !H2.undo.length;
-      r.disabled = !H2.redo.length;
+      u.disabled = !H2.undo.length && !viewUndo.length;
+      r.disabled = !H2.redo.length && !viewRedo.length;
       u.title = "Undo the last edit (Ctrl+Z) \xB7 " + H2.undo.length + " to go back through";
       r.title = "Redo (Ctrl+Shift+Z) \xB7 " + H2.redo.length + " to come forward through";
     };
     const back = () => {
       stopPlay();
+      const last = viewUndo[viewUndo.length - 1];
+      if (last && last.at >= H2.undo.length) {
+        putView(viewUndo.pop());
+        return;
+      }
       if (H2.back()) afterRestore();
     };
     const fwd = () => {
       stopPlay();
+      const nx = viewRedo[viewRedo.length - 1];
+      if (nx && nx.at === H2.undo.length) {
+        takeView(viewRedo.pop().el, true);
+        return;
+      }
       if (H2.forward()) afterRestore();
+    };
+    const mark0 = H2.mark;
+    H2.mark = (...a) => {
+      viewRedo.length = 0;
+      return mark0(...a);
     };
     u.addEventListener("click", back);
     r.addEventListener("click", fwd);
@@ -13128,8 +13194,10 @@ entering            q \xD7 sunlit glass area \xD7 SHGC   W</div>
     // shading added from the window's small window: on a plan or a section the new device is picked, to shape there
     addShading: (v) => {
       H2.mark("device");
+      const h0 = selShading(S), n0 = h0 ? h0.devices.length : 0;
       if (!addShading(v)) return;
-      if (POP.at && (POP.at.type === "section" || POP.at.type === "plan")) {
+      const h1 = selShading(S), n1 = h1 ? h1.devices.length : 0;
+      if (n1 - n0 === 1 || POP.at && (POP.at.type === "section" || POP.at.type === "plan")) {
         const r = selCell();
         ACTS.pickDev(r ? r.dev || 0 : 0);
       }
@@ -13685,7 +13753,7 @@ entering            q \xD7 sunlit glass area \xD7 SHGC   W</div>
       return;
     }
     if (v.classList.contains("full")) setFull(v, false);
-    removeView(v);
+    takeView(v);
     clearSunCache();
     schedule();
   });

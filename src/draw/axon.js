@@ -183,10 +183,11 @@ const RED_DEV = { fills: [['#C0442B', .92]], stroke: '#6E1F10', w: .45 };
 const grow = polys => ({ polys, node: polys.length <= BSP_CAP ? bspBuild(polys) : null });
 const walk = (t, e, flat) => t.node ? bspOrder(t.node, e, []) : paintOrder(t.polys, e, flat).order;
 let scene = { key: '', units: [], lines: [] };
-function sceneOf(F, cur) {
+/** full: the unit 'f:st:i' drawn with every member of its arrays - the one being edited - rather than a thinned few */
+function sceneOf(F, cur, full = '') {
   const { S, B } = F;
   const sun = cur.up ? cur.az.toFixed(3) + ',' + cur.alt.toFixed(3) : '-';
-  const key = [(B.context || []).map(b => [...b.c, b.a, ...b.h].map(x => x.toFixed(3)).join(',')).join(';'), S.rot || 0, S.storeys.map(s => [s.w, s.d, s.ox || 0, s.oy || 0, s.rot || 0, s.rotRel || 'building', s.oxyIn || 'own'].join('x')).join(','), sun, ...Object.values(B.facades).flatMap(fc => fc.rows.map(r => r.cell ? r.cell.key + (r.units.some(q => q.broken) ? '#' + r.units.map(q => q.cid).join(',') + '#' + r.units.filter(q => q.broken).map(q => q.cell.key).join('&') : '') : 'x' + r.h))].join('|');
+  const key = [(B.context || []).map(b => [...b.c, b.a, ...b.h].map(x => x.toFixed(3)).join(',')).join(';'), S.rot || 0, S.storeys.map(s => [s.w, s.d, s.ox || 0, s.oy || 0, s.rot || 0, s.rotRel || 'building', s.oxyIn || 'own'].join('x')).join(','), sun, ...Object.values(B.facades).flatMap(fc => fc.rows.map(r => r.cell ? r.cell.key + (r.units.some(q => q.broken) ? '#' + r.units.map(q => q.cid).join(',') + '#' + r.units.filter(q => q.broken).map(q => q.cell.key).join('&') : '') : 'x' + r.h)), full].join('|');
   if (scene.key === key) return scene;
   const backs = new Map(), fronts = new Map(), units = [];
   // each device thinned on its own, so a sparse array is never swallowed by a dense one
@@ -201,7 +202,8 @@ function sceneOf(F, cur) {
       const sl = cur.up ? solarAtFacade(cur, r.gf) : null;
       for (const q of r.units) {
         const qc = q.cell;
-        if (!fronts.has(qc.key)) fronts.set(qc.key, grow(thin(qc.elements).flatMap(b => boxFaces(b).map(f => bpoly(f.pts, f.n, 'dev', { sys: b.sys })))));
+        const all = !!full && full === fc.f + ':' + r.st + ':' + q.i, fk = qc.key + (all ? '|all' : '');
+        if (!fronts.has(fk)) fronts.set(fk, grow((all ? qc.elements : thin(qc.elements)).flatMap(b => boxFaces(b).map(f => bpoly(f.pts, f.n, 'dev', { sys: b.sys })))));
         const c2 = { onFacade: !!sl && sl[2] > 1e-6, sl };
         // a bay clipped at the end of a spaced side has a narrower wall of its own
         const bk = unitKey(B, fc.f, r.st, q.i) + '|' + q.r0.toFixed(4) + ',' + q.r1.toFixed(4) + '|' + (c2.onFacade ? sl.map(x => x.toFixed(5)).join(',') : '-');
@@ -209,7 +211,7 @@ function sceneOf(F, cur) {
         const f0 = fc.f, st0 = r.st, i0 = q.i, rect = { u0: q.r0, u1: q.r1, v0: 0, v1: r.h };
         const back = () => { let t = backs.get(bk); if (!t) backs.set(bk, t = grow(openingFaces(unitModel(B, f0, st0, i0), c2, rect, false, []))); return t; };
         units.push({ f: fc.f, st: r.st, i: q.i, cc: q.cc, zb: r.zb, rev: qc.reveal, cell: qc, broken: q.broken,
-          back, front: fronts.get(qc.key) });
+          back, front: fronts.get(fk) });
       }
     }
   }
@@ -519,7 +521,7 @@ export function drawAxon(F) {
   axonWinPop = null; axonSiteLines = []; axonSiteMids = null; axonIso = null; axonIsoDevs = [];
   // a window isolated: its own handles, and none of the building's
   // Advanced isolates the window to edit it; Simple edits the selected window and its shading where they stand
-  const direct = S.mode === 'simple' && (S.pick === 'window' || S.pick === 'device');
+  const direct = S.mode === 'simple' && S.sel.unit !== null && (S.pick === 'window' || S.pick === 'device');
   const iso = !!((V.iso || direct) && F.sel.unit !== null && m.opening);
   let selPr = null, selO = null;
   // a layer shows when it is on and its group is on
@@ -725,7 +727,8 @@ export function drawAxon(F) {
      bigger storey's walls come down over the one it overhangs, a setback
      storey stands on the roof of the one below. */
   const seen = {}, hits = [];
-  const sc = sceneOf(F, cur);
+  // the window being edited shows every member of its arrays, so each can be picked and dragged where it is drawn
+  const sc = sceneOf(F, cur, iso ? sel.f + ':' + sel.st + ':' + sel.unit : '');
   const visOf = (f, st) => { const W0 = F.B.facades[f].rows[st].frame.W; return cam.vis([W0[0], W0[1]]); };
   const seenSel = visOf(sel.f, sel.st);
   const style = q => {
@@ -883,7 +886,8 @@ export function drawAxon(F) {
         const a = cur.vsa * D2R * i / 20;
         arcp.push(v3.add(O, v3.mul(v3.add(v3.mul(nrm, Math.cos(a)), v3.mul(w0, Math.sin(a))), rad)));
       }
-      g += PATH(arcp.map((p, i) => (i ? 'L' : 'M') + P(p).map(v => fmt(v, 2)).join(',')).join(' '), { stroke: 'var(--sun)', w: 1 });
+      const thArc = arcp.map((p, i) => (i ? 'L' : 'M') + P(p).map(v => fmt(v, 2)).join(',')).join(' ');
+      g += PATH(thArc, { stroke: 'var(--sun)', w: 1 }) + hit(thArc);
       const lq = P(v3.add(O, v3.mul(v3.unit(v3.add(nrm, ray)), rad * 1.7)));
       const tb = Math.tan(cur.alt * D2R), cg = Math.cos(cur.gamma * D2R);
       angle(mk, 'theta', lq, 'θ', 'profile angle θ ' + fmt(cur.vsa, 1) + '°', 'θ = tan⁻¹(tan β / cos γ) = tan⁻¹(' + fmt(tb, 3) + ' / ' + fmt(cg, 3) + ')', 'var(--sun)', 'theta', 10);
@@ -930,9 +934,11 @@ export function drawAxon(F) {
     const sq = P(at([0, -1], span * 0.66));
     g += T(sq[0], sq[1] + 3, 'S', { anchor: 'middle', size: 9, fill: 'var(--ink3)' });
     if (Ly.azimuth) layer('azimuth', () => {
-      // the surface azimuth: due south round to the facade normal
-      g += PATH(pth([O, at(dirOf(gf), span * 0.5)]), { stroke: 'var(--glass)', w: 1.2 });
-      if (Math.abs(dev) > 0.5) g += PATH(pth(arcG(180, 180 + dev, span * 0.42)), { stroke: 'var(--glass)', w: 1.2, marker: 'url(#ad)' });
+      // the surface azimuth: due south round to the facade normal, named on hover
+      const mk = g.length, nArm = pth([O, at(dirOf(gf), span * 0.5)]), sArc = Math.abs(dev) > 0.5 ? pth(arcG(180, 180 + dev, span * 0.42)) : null;
+      g += PATH(nArm, { stroke: 'var(--glass)', w: 1.2 }) + hit(nArm);
+      if (sArc) g += PATH(sArc, { stroke: 'var(--glass)', w: 1.2, marker: 'url(#ad)' }) + hit(sArc);
+      angle(mk, 'surfaz', P(at(dirOf(180 + dev / 2), span * 0.47)), '', 'surface azimuth ' + fmt(dev, 1) + '°', 'the facade’s normal, from due south, east −', 'var(--glass)', 'surfAz', 8.5);
     });
     if (Ly.angles && cur.up) layer('angles', () => {
       const gdir = v3.unit([sv[0], sv[1], 0]);
@@ -1017,7 +1023,7 @@ export function drawAxon(F) {
           const ux = dir[0] / l, uy = dir[1] / l, tx = O[0] + 34 * ux, ty = O[1] + 34 * uy;
           g += L(O[0] + 6 * ux, O[1] + 6 * uy, tx - 6 * ux, ty - 6 * uy, { stroke: col, w: 1.8 })
             + POLY([[tx, ty], [tx - 10 * ux - 5 * uy, ty - 10 * uy + 5 * ux], [tx - 10 * ux + 5 * uy, ty - 10 * uy - 5 * ux]], { fill: col, stroke: col, w: .8 });
-          grips.push({ p: [tx - 4 * ux, ty - 4 * uy], key, from, dir, arrow: true, sgn: 1 });
+          grips.push({ p: [tx - 4 * ux, ty - 4 * uy], o: O, key, from, dir, arrow: true, sgn: 1 });
         }
         grips.push({ p: O, pop: true });
         g += CIRCLE(O[0], O[1], 5.5, { fill: 'var(--panel)', stroke: 'var(--ink2)', 'stroke-width': 1.4 }) + CIRCLE(O[0], O[1], 1.8, { fill: 'var(--ink2)' });
@@ -1042,7 +1048,7 @@ export function drawAxon(F) {
   }
   // the selected storey, ready to edit in place
   axonPlateEdit = null;
-  if (V.plate && V.plate.on && !iso) {
+  if (V.plate && V.plate.on && !(iso && V.iso)) {
     const pe = plateEdit(F, sel.st, zbs[sel.st], cam, P);
     g += pe.g; axonPlateEdit = pe.edit;
     g += T(12, 56, sel.st === 0 ? 'ground floor selected: it stays centred on the site · pull a face · pull its top for its height · turn it by its arc · click a figure to type it'

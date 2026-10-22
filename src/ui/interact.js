@@ -298,7 +298,7 @@ export function wireView(inst, app) {
   let drag = null;
   const axisStep = (cam, at, axis) => { const b = at.slice(); b[axis] += 1; const p0 = cam.P(at), p1 = cam.P(b); return [p1[0] - p0[0], p1[1] - p0[1]]; };
   det.addEventListener('pointerdown', e => {
-    if (e.target.closest && e.target.closest('[data-edit]')) return;
+    if (e.button === 0 && e.target.closest && e.target.closest('[data-edit]')) return;
     const v = viewPoint(det, e);
     // the end of the sun ray: dragged, the sun goes where it points
     const ds = inst.h.sun;
@@ -402,7 +402,7 @@ export function wireView(inst, app) {
     };
     const devAt = v => { const h = hitAt(v); return h ? h.i : null; };
     // a grip under the pointer; a line that drags whole - the site's - only where no grip is
-    const gripAt = v => v && ((inst.h.grips || []).find(g => !g.line && Math.hypot(v[0] - g.p[0], v[1] - g.p[1]) < 8)
+    const gripAt = v => v && ((inst.h.grips || []).find(g => !g.line && (Math.hypot(v[0] - g.p[0], v[1] - g.p[1]) < 8 || (g.arrow && g.o && segDist(v, g.o, g.p) < 5)))
       || (inst.h.grips || []).find(g => g.line && segD(v, g.line[0], g.line[1]) < 5));
     const handle = () => inst.h.handle;
     // the other drawing's cut, as it crosses this one: the plan carries the section's, the section the plan's
@@ -418,7 +418,7 @@ export function wireView(inst, app) {
       app.paint(inst);
     }, { passive: false });
     host.addEventListener('pointerdown', e => {
-    if (e.target.closest && e.target.closest('[data-edit], [data-set]')) return;
+    if (e.button === 0 && e.target.closest && e.target.closest('[data-edit], [data-set]')) return;
       const v = viewPoint(host, e); if (!v) return;
       travel = 0;
       // the middle or the right button pans - the sheet has nothing to orbit
@@ -752,11 +752,15 @@ export function wireView(inst, app) {
   const isoAt = v => {
     // the nearest; a device's tip before the window's own, which it may stand right over
     let best = null, bd = 9;
-    for (const g of inst.h.iso || []) { const d = Math.hypot(v[0] - g.p[0], v[1] - g.p[1]) - (g.dev ? 4 : 0); if (d < bd) { bd = d; best = g; } }
+    for (const g of inst.h.iso || []) {
+      // an arrow anywhere along its shaft; a gumball's grips before a window's
+      const d = (g.arrow && g.o ? Math.min(Math.hypot(v[0] - g.p[0], v[1] - g.p[1]), segDist(v, g.o, g.p) + 2) : Math.hypot(v[0] - g.p[0], v[1] - g.p[1])) - (g.dev || g.arrow || g.pop ? 4 : 0);
+      if (d < bd) { bd = d; best = g; }
+    }
     return best;
   };
   ax.addEventListener('pointerdown', e => {
-    if (e.target.closest && e.target.closest('[data-edit]')) return;
+    if (e.button === 0 && e.target.closest && e.target.closest('[data-edit]')) return;
     if (V.place.on && e.button === 0) { const p = groundAt(e); if (p) app.placeContext(p); e.preventDefault(); return; }
     const v = viewPoint(ax, e);
     // a window isolated: its grips - its devices' among them - and nothing of the building's
@@ -801,6 +805,10 @@ export function wireView(inst, app) {
       }
     }
     ad = { x: e.clientX, y: e.clientY, x0: e.clientX, y0: e.clientY, v, moved: false, mode: camMode(e) };
+    if (ad.mode === 'orbit' && v && inst.h.focus) {
+      const f = inst.h.focus, q = axonCamera(S, V.axcam).P(f), c0 = axonCamera(S, Object.assign({}, V.axcam, { focus: f, panX: 0, panY: 0 })).P(f);
+      Object.assign(V.axcam, { focus: f.slice(), panX: q[0] - c0[0], panY: q[1] - c0[1] });
+    }
     // a window of an array under a left press: moved, it drags the array's spacing; let go where it was, it is a click
     if (v && ad.mode === 'click' && !V.iso) {
       const glass = (inst.h.hits || []).filter(h => h.unit !== null && inside(h.pts, v[0], v[1]));

@@ -17,7 +17,15 @@ export function makeWidget(cls, hooks = {}) {
   el.className = 'devpop' + (cls ? ' ' + cls : ''); el.hidden = true;
   document.body.appendChild(el);
   const w = { el, at: null, st: 'closed', off: null, anchor: null, stay: !!hooks.stay, html: '', hooks };
+  // a right-drag begun on it goes to its view underneath: the orbit, or the pan, is not stopped by it
+  el.addEventListener('contextmenu', e => e.preventDefault());
   el.addEventListener('pointerdown', e => {
+    if (e.button === 2 && w.at && w.at.host) {
+      const h = w.at.host;
+      h.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, cancelable: true, clientX: e.clientX, clientY: e.clientY, button: 2, buttons: 2, pointerId: e.pointerId, pointerType: e.pointerType, shiftKey: e.shiftKey, altKey: e.altKey, ctrlKey: e.ctrlKey }));
+      try { h.setPointerCapture(e.pointerId); } catch (_) { }
+      e.preventDefault(); return;
+    }
     if (e.button !== 0) return;
     const act = e.target.closest('[data-popact]');
     if (act) {

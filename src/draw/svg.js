@@ -127,7 +127,7 @@ export function gumball(grips, ox, oy, axes) {
     s += POLY([[tx, ty], [tx - 10 * ux - 5 * uy, ty - 10 * uy + 5 * ux], [tx - 10 * ux + 5 * uy, ty - 10 * uy - 5 * ux]], { fill: c, stroke: c, w: .8 });
     // which way the figure runs along the arrow, so a typed move goes the way the arrow points
     const sgn = Math.sign(ux * a.dir[0] + uy * a.dir[1]) || 1;
-    grips.push({ p: [tx - 4 * ux, ty - 4 * uy], key: a.key, from: a.from, dir: a.dir, arrow: true, sgn });
+    grips.push({ p: [tx - 4 * ux, ty - 4 * uy], o: [ox, oy], key: a.key, from: a.from, dir: a.dir, arrow: true, sgn });
   });
   grips.push({ p: [ox, oy], pop: true });
   return s + CIRCLE(ox, oy, 5.5, { fill: 'var(--panel)', stroke: 'var(--ink2)', 'stroke-width': 1.4 }) + CIRCLE(ox, oy, 1.8, { fill: 'var(--ink2)' });

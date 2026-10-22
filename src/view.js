@@ -39,7 +39,7 @@ export const V = {
   /** the plan's and the section's handles and typed figures, shown on request */
   edit: false,
   /** where the site view draws its angles: 'ground', the window's 'level', or about the 'window' */
-  angAt: 'ground',
+  angAt: 'cut',
   /** the device is see-through by default: a solid array stands between the eye
    *  and the sunlit glass, which is the one thing the window view is for */
   detSolid: false,

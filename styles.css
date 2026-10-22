@@ -571,7 +571,12 @@ body.hasfull{overflow:hidden}
 /* figures typed over in a drawing, and names scrubbed in a bar */
 .view svg .editable{cursor:text}
 /* an angle in the building view: its bare symbol at rest; hovered, or its figure hovered on the foot line, its value and working */
-.view svg .ang .anglab{opacity:0; transition:opacity .12s}
+/* full screen, the view is its own scroller: the camera's buttons sit at the drawing's top, under its bar */
+.view.full .vfloat.vfTR{top:calc(var(--vbh, 38px) + 6px)}
+/* an angle's name and working take no pointer until its construction is hovered: hidden, it never stands over a handle */
+.view svg .ang .anglab{opacity:0; transition:opacity .12s; pointer-events:none}
+.view svg .ang polygon{pointer-events:none}
+.view svg .ang:hover .anglab{pointer-events:auto}
 .view svg .ang:hover .anglab, .view svg .ang.hl .anglab{opacity:1}
 .view svg .ang .angsym{transition:opacity .12s}
 .view svg .ang:hover .angsym, .view svg .ang.hl .angsym{opacity:0}

@@ -1474,7 +1474,7 @@ const DEMO_SITE = { edit: 'S', S: { kind: 'street', off: 0, width: 20, curb: 3 }
   // across each street, a building that shades it: a 22 m slab across the narrow street, a low block across the wide one
   ctx: [{ id: 'k1', w: 16, d: 30, h: 22, x: 38, y: 0, a: 0 }, { id: 'k2', w: 40, d: 14, h: 9, x: 0, y: -41, a: 0 }], ctxSeq: 2, ctxFrame: 'building', ctxSel: null };
 export const TYPOLOGIES = {
-  blank: { label: 'Default', sub: 'one storey, a window each side', about: 'A single 3.6 m storey on a 30 × 18 m floorplate, a 1.5 × 1.8 m window in the middle of each side and no shading: build it up yourself.', each: true, plnW: 30, plnD: 18, runs: [[1, 3.6, 0.3, null]], st: 0 },
+  blank: { label: 'Default', sub: 'one storey, a window each side', about: 'A single 3.6 m storey on a 10 × 10 m floorplate, a 1.5 × 1.8 m window in the middle of each side and no shading: build it up yourself.', each: true, plnW: 10, plnD: 10, runs: [[1, 3.6, 0.3, null]], st: 0 },
   officeTower: { label: 'Glazed office tower', sub: 'curtain wall · 20 storeys', about: 'A 36 × 30 m office floorplate, 20 storeys: a 6 m lobby and 4 m office floors in curtain wall on a 1.5 m module, glass to glass, under a 1 m slab band, solar-control glass (SHGC 0.28).', plnW: 36, plnD: 30,
     runs: [[1, 6.0, 0.6, ALL(CW_LOBBY)], [19, 4.0, 1.0, ALL(CW_OFFICE)]], st: 9 },
   resTower: { label: 'Glazed residential tower', sub: 'window wall · 30 storeys', about: 'A 24 × 24 m point tower, 30 storeys: a 4.5 m storefront base, then 2.9 m residential floors in window wall, set back 50 mm behind 250 mm slab edges (SHGC 0.33).', plnW: 24, plnD: 24,
