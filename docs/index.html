@@ -76,6 +76,7 @@ body.simple .adv, body.simple .laygrp[data-grp="site"], body:not(.simple) .simpl
 .vbtns .vb svg, #dockFull svg{display:block}
 .vbtns .vb[data-vfull], #dockFull{display:inline-flex; align-items:center; justify-content:center}
 .minibtn.iconbtn{display:inline-flex; align-items:center; justify-content:center; padding:3px 6px; line-height:0}
+.masthead .modeseg{display:inline-flex; align-self:center}
 .modeseg button[aria-pressed="true"]{background:var(--ink); color:var(--panel); border-color:var(--ink)}
 .ctxmenu .popnote{display:block; margin:0 4px 6px; font-size:12px; color:var(--ink2); max-width:250px; line-height:1.35}
 /* the panel is empty: everything it held is on the drawings, their bars and small windows, and the settings bar */
@@ -723,6 +724,7 @@ label.tipped{display:inline}
   <div class="chips">
     <span class="chip">49.19&deg;N 123.18&deg;W &middot; <b>Vancouver</b></span>
     <span class="chip">UTC<b>&minus;8</b></span>
+    <span class="seg mini modeseg" title="Simple: one storey with one window on each side, shading devices kept on each window, results for the selected window - the tool at its plainest. Advanced: storeys, window arrays, site boundaries and streets, linked shading groups, the library, typologies and export."><button type="button" data-mode="simple" aria-pressed="true">Simple</button><button type="button" data-mode="advanced" aria-pressed="false">Advanced</button></span>
     <details class="dd guideDD"><summary class="chip hbtn" title="A walk round the tool, or a worked example done step by step in it">Guide</summary><div class="ddmenu">
       <button type="button" class="minibtn" data-guide="tour" title="What each part of the page is for, and how its drawings are worked">How to use the tool</button>
       <button type="button" class="minibtn" data-guide="example" title="An overhang sized for one moment by hand-method steps, then checked over the day and against the climate - the page set up for each step">Worked example: size an overhang</button>
@@ -7565,6 +7567,7 @@ label.tipped{display:inline}
   var axonCtxEdit = null;
   var axonPlateEdit = null;
   var axonFocus = null;
+  var axonRay = null;
   var axonWinPop = null;
   var axonIso = null;
   var axonIsoDevs = [];
@@ -7597,6 +7600,7 @@ label.tipped{display:inline}
     axonSiteMids = null;
     axonIso = null;
     axonIsoDevs = [];
+    axonRay = null;
     const direct = S2.mode === "simple" && S2.sel.unit !== null && (S2.pick === "window" || S2.pick === "device");
     const iso = !!((V2.iso || direct) && F.sel.unit !== null && m.opening);
     let selPr = null, selO = null;
@@ -8017,6 +8021,7 @@ label.tipped{display:inline}
       const Psun = v3.mul(sv, Rdome), pS = P(Psun), pO0 = P([0, 0, 0]);
       const enter = blockEntry(Psun, v3.mul(sv, -1), S2), pE = P(enter || [0, 0, 0]);
       g += L(pS[0], pS[1], pE[0], pE[1], { stroke: "var(--sun)", w: 1.5, marker: "url(#ar)" });
+      axonRay = [pS, pE];
       if (enter) g += L(pE[0], pE[1], pO0[0], pO0[1], { stroke: "var(--sun)", w: 0.8, dash: "2 3", op: 0.45 });
       g += CIRCLE(pO0[0], pO0[1], 2.2, { fill: "none", stroke: "var(--sun)", "stroke-width": 0.9 });
       g += CIRCLE(pS[0], pS[1], 11, { fill: "var(--sun)", opacity: 0.18 });
@@ -9507,7 +9512,6 @@ label.tipped{display:inline}
     host.innerHTML = `
   <button type="button" class="tuck" id="barTuck" title="Tuck the calculation settings away" aria-expanded="true">\u25B4</button>
   <span class="cbtitle">Calculation settings</span>
-  <span class="seg mini modeseg" title="Simple: one storey with one window on each side, shading devices kept on each window, results for the selected window - the tool at its plainest. Advanced: storeys, window arrays, site boundaries and streets, linked shading groups, the library, typologies and export."><button type="button" data-mode="simple" aria-pressed="true">Simple</button><button type="button" data-mode="advanced" aria-pressed="false">Advanced</button></span>
   <label class="barsel"><span class="tipped" title="An hour-by-hour typical year for Vancouver, shifted for warming. It colours the sun chart's dots by temperature and gives the beam for the average and recorded days and every yearly total; a clear day does not depend on it.">Weather file</span> <select data-k="wx" id="c_wx">${Object.entries(WEATHER_FILES).map(([k, l]) => `<option value="${k}">${l}</option>`).join("")}<option value="__epw" title="An EnergyPlus weather file of your own - such as a future-shifted file from the Pacific Climate Impacts Consortium. Its hours are read as Pacific Standard Time, the sun as Vancouver's.">Load an .epw file\u2026</option></select><input type="file" id="epwFile" accept=".epw" hidden></label>
   <label class="barsel adv"><span class="tipped" title="Which windows the plan's floor, the 3D view's light, the sun chart's shading, the solar heat gain and its charts are for.">Results for</span> <select data-k="scope" id="c_scope">${Object.entries(SCOPES).map(([k, l]) => `<option value="${k}">${l}</option>`).join("")}</select></label>
   <label class="barsel">Sky ${seg2("sky", [["clear", "Clear day"], ["average", "Average day"], ["recorded", "Recorded day"]], "mini")}</label>
@@ -11180,15 +11184,15 @@ entering            q \xD7 sunlit glass area \xD7 SHGC   W</div>
     };
     let ad = null;
     const isoAt = (v) => {
-      let best = null, bd = 9;
+      const rank = (g) => g.arrow || g.pop ? 2 : g.rot ? 1 : g.key && g.key.startsWith("g.") ? 3 : 0;
+      const dist = (g) => g.arrow && g.o ? Math.min(Math.hypot(v[0] - g.p[0], v[1] - g.p[1]), segDist(v, g.o, g.p) + 2) : Math.hypot(v[0] - g.p[0], v[1] - g.p[1]);
+      let best = null;
       for (const g of inst.h.iso || []) {
-        const d = (g.arrow && g.o ? Math.min(Math.hypot(v[0] - g.p[0], v[1] - g.p[1]), segDist(v, g.o, g.p) + 2) : Math.hypot(v[0] - g.p[0], v[1] - g.p[1])) - (g.dev || g.arrow || g.pop ? 4 : 0);
-        if (d < bd) {
-          bd = d;
-          best = g;
-        }
+        const d = dist(g);
+        if (d >= 9) continue;
+        if (!best || rank(g) < best.r || rank(g) === best.r && d < best.d) best = { g, r: rank(g), d };
       }
-      return best;
+      return best ? best.g : null;
     };
     ax.addEventListener("pointerdown", (e) => {
       if (e.button === 0 && e.target.closest && e.target.closest("[data-edit]")) return;
@@ -11288,9 +11292,15 @@ entering            q \xD7 sunlit glass area \xD7 SHGC   W</div>
         return;
       }
       if (v && sp.alt > 0 && !e.shiftKey && e.button === 0) {
-        const sv = sunVec(sp.alt, sp.az), q = domeProject()(sp.alt, sp.az, sv[0], sv[1], sv[2]);
-        if (Math.hypot(q[0] - v[0], q[1] - v[1]) < 16) {
-          ad = { sun: true };
+        const sv = sunVec(sp.alt, sp.az), q = domeProject()(sp.alt, sp.az, sv[0], sv[1], sv[2]), ry = inst.h.ray;
+        const onRay = ry && (() => {
+          const L2 = Math.hypot(ry[1][0] - ry[0][0], ry[1][1] - ry[0][1]);
+          if (L2 < 20) return false;
+          const t = (L2 - 14) / L2, end = [ry[0][0] + (ry[1][0] - ry[0][0]) * t, ry[0][1] + (ry[1][1] - ry[0][1]) * t];
+          return segDist(v, ry[0], end) < 6;
+        })();
+        if (Math.hypot(q[0] - v[0], q[1] - v[1]) < 16 || onRay) {
+          ad = { sun: true, off: [q[0] - v[0], q[1] - v[1]] };
           try {
             ax.setPointerCapture(e.pointerId);
           } catch (_) {
@@ -11402,8 +11412,8 @@ entering            q \xD7 sunlit glass area \xD7 SHGC   W</div>
         return;
       }
       if (ad.sun) {
-        const v = viewPoint(ax, e);
-        if (v) applySun(pickSun(S2, v[0], v[1], domeProject()));
+        const v = viewPoint(ax, e), o = ad.off || [0, 0];
+        if (v) applySun(pickSun(S2, v[0] + o[0], v[1] + o[1], domeProject()));
         return;
       }
       if (ad.rot) {
@@ -12362,7 +12372,7 @@ entering            q \xD7 sunlit glass area \xD7 SHGC   W</div>
         if (inst.V.iso && (S.sel.unit === null || !selCell())) inst.V.iso = false;
         inst.el.classList.toggle("iso", !!inst.V.iso);
         inst.host.innerHTML = drawAxon(Fi);
-        inst.h = { hits: axonHits, handle: axonHandle, focus: axonFocus, ctxHits: axonCtxHits, ctxEdit: axonCtxEdit, plateEdit: axonPlateEdit, pop: axonWinPop, siteLines: axonSiteLines, siteMids: axonSiteMids, iso: axonIso, isoDevs: axonIsoDevs };
+        inst.h = { hits: axonHits, handle: axonHandle, focus: axonFocus, ctxHits: axonCtxHits, ctxEdit: axonCtxEdit, plateEdit: axonPlateEdit, pop: axonWinPop, siteLines: axonSiteLines, siteMids: axonSiteMids, iso: axonIso, isoDevs: axonIsoDevs, ray: axonRay };
         devPop(inst, F);
         storeyPop(inst);
         sitePop(inst);
@@ -13297,11 +13307,12 @@ entering            q \xD7 sunlit glass area \xD7 SHGC   W</div>
       if (L2.ghost) {
         S.doy = L2.ghost.doy;
         S.hour = L2.ghost.hour;
+        if (L2.ghost.n) recUI.nh = recUI.nv = recUI.nc = L2.ghost.n;
         liveCompare();
         return;
       }
       const F = lastF, md = monthDayOf(S.doy);
-      liveCompare({ label: MONTHS[md.m - 1] + " " + md.d + " " + hhmm(S.hour), doy: S.doy, hour: S.hour, th: F && F.cur.onFacade ? F.cur.vsa : null, gam: F ? -F.cur.gamma : null });
+      liveCompare({ label: MONTHS[md.m - 1] + " " + md.d + " " + hhmm(S.hour), doy: S.doy, hour: S.hour, n: recUI.nh, th: F && F.cur.onFacade ? F.cur.vsa : null, gam: F ? -F.cur.gamma : null });
     },
     liveExt: (on) => {
       H2.mark("live");
@@ -13855,12 +13866,13 @@ entering            q \xD7 sunlit glass area \xD7 SHGC   W</div>
   render();
   var VIEW_AT = (t) => () => document.querySelector(".view[data-type=" + t + "]");
   var TOUR = [
-    { title: "Calculation settings", at: "#calcBar", html: "<p>The date, the time and the clock. <b>Solar time</b> is the sun\u2019s own: noon is when it stands due south, as sun charts are drawn; the other clocks are Vancouver\u2019s, standard and daylight.</p><p>The sky and the weather file set how much sun there is to keep out. <b>Simple</b> keeps to one storey with one window a side; <b>Advanced</b> opens storeys, sites and a library of designs.</p>" },
-    { title: "Building in 3D", at: VIEW_AT("axon"), html: "<p>Drag the sun on the dome to move it through the sky. Turn the building by the long arrow on the ground: its figure is the selected side\u2019s surface azimuth, measured from due south, east negative.</p><p>Click a window to select it. The angles at its foot - \u03B2, the solar azimuth, \u03B3 and \u03B8 - show their value and working when the pointer is over them. <b>Layers</b> sets what the sky shows, and how strongly.</p>" },
+    { title: "Simple and Advanced", at: () => document.querySelector(".masthead .modeseg"), html: "<p><b>Simple</b> keeps to one storey with one window a side, edited where it stands in the building view. <b>Advanced</b> opens storeys, sites, typologies and a library of designs, and isolates a window to edit it. Each mode keeps the design it was left with.</p>" },
+    { title: "Calculation settings", at: "#calcBar", html: "<p>The date, the time and the clock. <b>Solar time</b> is the sun\u2019s own: noon is when it stands due south, as sun charts are drawn; the other clocks are Vancouver\u2019s, standard and daylight.</p><p>The sky and the weather file set how much sun there is to keep out.</p>" },
+    { title: "Building in 3D", at: VIEW_AT("axon"), html: "<p>Drag the sun on the dome - or anywhere along its ray - to move it through the sky. Turn the building by the long arrow on the ground: its figure is the selected side\u2019s surface azimuth, measured from due south, east negative.</p><p>Click a window to select it. The angles at its foot - \u03B2, the solar azimuth, \u03B3 and \u03B8 - show their value and working when the pointer is over them. <b>Layers</b> sets what the sky shows, and how strongly.</p>" },
     { title: "The window pop-over", at: VIEW_AT("axon"), html: "<p>A selected window opens a pop-over beside it: add horizontal or vertical shading, or a preset.</p><p>In <b>Simple</b> the window\u2019s handles show as soon as it is selected - its jambs, sill and head, and the middle of the pane for its set-back; in <b>Advanced</b>, <b>Edit window in 3D</b> isolates it first. Click a device to edit it as the section and plan do: its depth, turn and length, a gumball that moves it along, out from and up the facade (Alt-drag for a copy), and its alignment, justification and hinge in its pop-over. Drag a member of an array to change how many there are.</p>" },
     { title: "Section and plan", at: VIEW_AT("section"), html: "<p>The section reads the profile angle \u03B8; the plan reads \u03B3 and the sun on the floor. Click a device to pick it, then drag its grips, or click a figure to type it. Alt-drag its gumball for a copy.</p><p>Pulling a device\u2019s depth, or turning it, snaps where its end falls on the sun\u2019s angle line now - where it just shades the window at this instant.</p>" },
     { title: "Sun path chart", at: VIEW_AT("sun"), html: "<p>The sun\u2019s bearing and altitude over the day, with the shading the window\u2019s devices give drawn in grey: the solid line is the cut-off as built, the dashed one the same devices taken as long and thin, as a protractor reads them. The pointer\u2019s \u03B2, azimuth, \u03B3 and \u03B8 are read at the top right.</p><p>The weather dots are each hour of the weather file, coloured by its temperature: keep the warm ones out, let the cool ones in. <b>Shade from chart</b> sizes shading from cut-offs dragged here.</p>" },
-    { title: "Live shading", at: VIEW_AT("section"), html: "<p><b>Live shading</b> puts the ideal members on the selected window for the date and time set, and remakes them as they change. Choose horizontal, vertical, an egg-crate or a louvred canopy, or let Auto pick, and how many members share the work.</p><p><b>Compare</b> keeps this moment\u2019s members as a ghost while another is set; pressed again, the ghost goes and the clock returns to its moment. Turn it off to keep the shading, or put back what the window had.</p>" },
+    { title: "Live shading", at: VIEW_AT("section"), html: "<p><b>Live shading</b> puts the ideal members on the selected window for the date and time set, and remakes them as they change. Choose horizontal, vertical, an egg-crate or a louvred canopy, or let Auto pick, and how many members share the work.</p><p><b>Compare</b> keeps this moment\u2019s members as a ghost while another is set; pressed again, the ghost goes and the clock and the member count return to its moment. Turn it off to keep the shading, or put back what the window had.</p>" },
     { title: "Solar heat gain", at: "#calcBar", html: "<p>The row under the settings is the direct solar heat through the selected window: <b>now</b>, <b>over the day</b> and <b>over a year</b>, each with how much of it the shading keeps out and what the bare window would let in. <b>\u0192</b> beside each shows the working.</p><p>The same can be read as charts: choose <b>Heat gain \xB7 day</b> or <b>Heat gain \xB7 year</b> from any view\u2019s name menu - the day hour by hour, the year month by month, shaded against bare.</p>" }
   ];
   function setupExample() {

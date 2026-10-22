@@ -38,7 +38,7 @@ import { sheetFor, buildLayout, wireLayout, margins, removeView, saveLayout } fr
 import { dotsOpts, createView, VIEW_TYPES, devicePopHTML, windowPopHTML, emptyPopHTML, storeyPopHTML, sitePopHTML, ctxPopHTML } from './ui/views.js';
 import { makeWidget, openWidget, closeWidget, hideWidget, showWidget } from './ui/widgets.js';
 import { buildCell as liveCell, SLAB0 as LIVE_SLAB0 } from './geometry/cell.js';
-import { axonIso, axonIsoDevs } from './draw/axon.js';
+import { axonIso, axonIsoDevs, axonRay } from './draw/axon.js';
 import { bboxOf } from './draw/svg.js';
 import { startTour } from './ui/tour.js';
 import { facadeLength as liveLen, facadeAzimuth as liveAz } from './geometry/building.js';
@@ -454,7 +454,7 @@ function drawInstBody(inst, F0, ctx) {
       // a window isolated keeps to the window selected: with none, the building's own handles are back
       if (inst.V.iso && (S.sel.unit === null || !selCell())) inst.V.iso = false;
       inst.el.classList.toggle('iso', !!inst.V.iso);
-      inst.host.innerHTML = drawAxon(Fi); inst.h = { hits: axonHits, handle: axonHandle, focus: axonFocus, ctxHits: axonCtxHits, ctxEdit: axonCtxEdit, plateEdit: axonPlateEdit, pop: axonWinPop, siteLines: axonSiteLines, siteMids: axonSiteMids, iso: axonIso, isoDevs: axonIsoDevs };
+      inst.host.innerHTML = drawAxon(Fi); inst.h = { hits: axonHits, handle: axonHandle, focus: axonFocus, ctxHits: axonCtxHits, ctxEdit: axonCtxEdit, plateEdit: axonPlateEdit, pop: axonWinPop, siteLines: axonSiteLines, siteMids: axonSiteMids, iso: axonIso, isoDevs: axonIsoDevs, ray: axonRay };
       devPop(inst, F); storeyPop(inst); sitePop(inst); ctxPop(inst);
       setTitle(inst, titleBlock('Site angles', [
         ['β', cur.up ? fmt(cur.alt, 1) + '°' : 'sun down', 'sunAlt'], ['solar azimuth', cur.up ? fmt(wrap180(cur.az - 180), 1) + '° from S' : '—', 'sunAz'], ['γ', cur.up ? fmt(-cur.gamma, 1) + '°' : '—', 'gamma']]));
@@ -1068,9 +1068,9 @@ const ACTS = {
     const L = S.live;
     if (!L) return;
     // let go, the ghost takes the clock back to the moment it was frozen at
-    if (L.ghost) { S.doy = L.ghost.doy; S.hour = L.ghost.hour; liveCompare(); return; }
+    if (L.ghost) { S.doy = L.ghost.doy; S.hour = L.ghost.hour; if (L.ghost.n) recUI.nh = recUI.nv = recUI.nc = L.ghost.n; liveCompare(); return; }
     const F = lastF, md = liveDate(S.doy);
-    liveCompare({ label: MONTHS[md.m - 1] + ' ' + md.d + ' ' + hhmm(S.hour), doy: S.doy, hour: S.hour, th: F && F.cur.onFacade ? F.cur.vsa : null, gam: F ? -F.cur.gamma : null });
+    liveCompare({ label: MONTHS[md.m - 1] + ' ' + md.d + ' ' + hhmm(S.hour), doy: S.doy, hour: S.hour, n: recUI.nh, th: F && F.cur.onFacade ? F.cur.vsa : null, gam: F ? -F.cur.gamma : null });
   },
   liveExt: on => { H.mark('live'); if (S.live) S.live.ext = !!on; },
   liveSrc: k => {
@@ -1398,12 +1398,13 @@ render();
    climate from the sun path chart. */
 const VIEW_AT = t => () => document.querySelector('.view[data-type=' + t + ']');
 const TOUR = [
-  { title: 'Calculation settings', at: '#calcBar', html: '<p>The date, the time and the clock. <b>Solar time</b> is the sun’s own: noon is when it stands due south, as sun charts are drawn; the other clocks are Vancouver’s, standard and daylight.</p><p>The sky and the weather file set how much sun there is to keep out. <b>Simple</b> keeps to one storey with one window a side; <b>Advanced</b> opens storeys, sites and a library of designs.</p>' },
-  { title: 'Building in 3D', at: VIEW_AT('axon'), html: '<p>Drag the sun on the dome to move it through the sky. Turn the building by the long arrow on the ground: its figure is the selected side’s surface azimuth, measured from due south, east negative.</p><p>Click a window to select it. The angles at its foot - β, the solar azimuth, γ and θ - show their value and working when the pointer is over them. <b>Layers</b> sets what the sky shows, and how strongly.</p>' },
+  { title: 'Simple and Advanced', at: () => document.querySelector('.masthead .modeseg'), html: '<p><b>Simple</b> keeps to one storey with one window a side, edited where it stands in the building view. <b>Advanced</b> opens storeys, sites, typologies and a library of designs, and isolates a window to edit it. Each mode keeps the design it was left with.</p>' },
+  { title: 'Calculation settings', at: '#calcBar', html: '<p>The date, the time and the clock. <b>Solar time</b> is the sun’s own: noon is when it stands due south, as sun charts are drawn; the other clocks are Vancouver’s, standard and daylight.</p><p>The sky and the weather file set how much sun there is to keep out.</p>' },
+  { title: 'Building in 3D', at: VIEW_AT('axon'), html: '<p>Drag the sun on the dome - or anywhere along its ray - to move it through the sky. Turn the building by the long arrow on the ground: its figure is the selected side’s surface azimuth, measured from due south, east negative.</p><p>Click a window to select it. The angles at its foot - β, the solar azimuth, γ and θ - show their value and working when the pointer is over them. <b>Layers</b> sets what the sky shows, and how strongly.</p>' },
   { title: 'The window pop-over', at: VIEW_AT('axon'), html: '<p>A selected window opens a pop-over beside it: add horizontal or vertical shading, or a preset.</p><p>In <b>Simple</b> the window’s handles show as soon as it is selected - its jambs, sill and head, and the middle of the pane for its set-back; in <b>Advanced</b>, <b>Edit window in 3D</b> isolates it first. Click a device to edit it as the section and plan do: its depth, turn and length, a gumball that moves it along, out from and up the facade (Alt-drag for a copy), and its alignment, justification and hinge in its pop-over. Drag a member of an array to change how many there are.</p>' },
   { title: 'Section and plan', at: VIEW_AT('section'), html: '<p>The section reads the profile angle θ; the plan reads γ and the sun on the floor. Click a device to pick it, then drag its grips, or click a figure to type it. Alt-drag its gumball for a copy.</p><p>Pulling a device’s depth, or turning it, snaps where its end falls on the sun’s angle line now - where it just shades the window at this instant.</p>' },
   { title: 'Sun path chart', at: VIEW_AT('sun'), html: '<p>The sun’s bearing and altitude over the day, with the shading the window’s devices give drawn in grey: the solid line is the cut-off as built, the dashed one the same devices taken as long and thin, as a protractor reads them. The pointer’s β, azimuth, γ and θ are read at the top right.</p><p>The weather dots are each hour of the weather file, coloured by its temperature: keep the warm ones out, let the cool ones in. <b>Shade from chart</b> sizes shading from cut-offs dragged here.</p>' },
-  { title: 'Live shading', at: VIEW_AT('section'), html: '<p><b>Live shading</b> puts the ideal members on the selected window for the date and time set, and remakes them as they change. Choose horizontal, vertical, an egg-crate or a louvred canopy, or let Auto pick, and how many members share the work.</p><p><b>Compare</b> keeps this moment’s members as a ghost while another is set; pressed again, the ghost goes and the clock returns to its moment. Turn it off to keep the shading, or put back what the window had.</p>' },
+  { title: 'Live shading', at: VIEW_AT('section'), html: '<p><b>Live shading</b> puts the ideal members on the selected window for the date and time set, and remakes them as they change. Choose horizontal, vertical, an egg-crate or a louvred canopy, or let Auto pick, and how many members share the work.</p><p><b>Compare</b> keeps this moment’s members as a ghost while another is set; pressed again, the ghost goes and the clock and the member count return to its moment. Turn it off to keep the shading, or put back what the window had.</p>' },
   { title: 'Solar heat gain', at: '#calcBar', html: '<p>The row under the settings is the direct solar heat through the selected window: <b>now</b>, <b>over the day</b> and <b>over a year</b>, each with how much of it the shading keeps out and what the bare window would let in. <b>ƒ</b> beside each shows the working.</p><p>The same can be read as charts: choose <b>Heat gain · day</b> or <b>Heat gain · year</b> from any view’s name menu - the day hour by hour, the year month by month, shaded against bare.</p>' }
 ];
 function setupExample() {

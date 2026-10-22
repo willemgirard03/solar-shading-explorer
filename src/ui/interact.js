@@ -751,13 +751,16 @@ export function wireView(inst, app) {
   // the isolated window's grip under the pointer
   const isoAt = v => {
     // the nearest; a device's tip before the window's own, which it may stand right over
-    let best = null, bd = 9;
+    // in turn: a device's push/pull handles, its turning arc, its gumball - an arrow anywhere along its shaft - then the window's own
+    const rank = g => g.arrow || g.pop ? 2 : g.rot ? 1 : g.key && g.key.startsWith('g.') ? 3 : 0;
+    const dist = g => g.arrow && g.o ? Math.min(Math.hypot(v[0] - g.p[0], v[1] - g.p[1]), segDist(v, g.o, g.p) + 2) : Math.hypot(v[0] - g.p[0], v[1] - g.p[1]);
+    let best = null;
     for (const g of inst.h.iso || []) {
-      // an arrow anywhere along its shaft; a gumball's grips before a window's
-      const d = (g.arrow && g.o ? Math.min(Math.hypot(v[0] - g.p[0], v[1] - g.p[1]), segDist(v, g.o, g.p) + 2) : Math.hypot(v[0] - g.p[0], v[1] - g.p[1])) - (g.dev || g.arrow || g.pop ? 4 : 0);
-      if (d < bd) { bd = d; best = g; }
+      const d = dist(g);
+      if (d >= 9) continue;
+      if (!best || rank(g) < best.r || (rank(g) === best.r && d < best.d)) best = { g, r: rank(g), d };
     }
-    return best;
+    return best ? best.g : null;
   };
   ax.addEventListener('pointerdown', e => {
     if (e.button === 0 && e.target.closest && e.target.closest('[data-edit]')) return;
@@ -799,9 +802,11 @@ export function wireView(inst, app) {
       ad = { rot: true }; try { ax.setPointerCapture(e.pointerId); } catch (_) { } ax.classList.add('drag'); e.preventDefault(); return;
     }
     if (v && sp.alt > 0 && !e.shiftKey && e.button === 0) {
-      const sv = sunVec(sp.alt, sp.az), q = domeProject()(sp.alt, sp.az, sv[0], sv[1], sv[2]);
-      if (Math.hypot(q[0] - v[0], q[1] - v[1]) < 16) {
-        ad = { sun: true }; try { ax.setPointerCapture(e.pointerId); } catch (_) { } ax.classList.add('drag'); e.preventDefault(); return;
+      const sv = sunVec(sp.alt, sp.az), q = domeProject()(sp.alt, sp.az, sv[0], sv[1], sv[2]), ry = inst.h.ray;
+      // its ray, short of where it meets the building, picks it up too - so the sun need not be in sight to be moved
+      const onRay = ry && (() => { const L = Math.hypot(ry[1][0] - ry[0][0], ry[1][1] - ry[0][1]); if (L < 20) return false; const t = (L - 14) / L, end = [ry[0][0] + (ry[1][0] - ry[0][0]) * t, ry[0][1] + (ry[1][1] - ry[0][1]) * t]; return segDist(v, ry[0], end) < 6; })();
+      if (Math.hypot(q[0] - v[0], q[1] - v[1]) < 16 || onRay) {
+        ad = { sun: true, off: [q[0] - v[0], q[1] - v[1]] }; try { ax.setPointerCapture(e.pointerId); } catch (_) { } ax.classList.add('drag'); e.preventDefault(); return;
       }
     }
     ad = { x: e.clientX, y: e.clientY, x0: e.clientX, y0: e.clientY, v, moved: false, mode: camMode(e) };
@@ -874,7 +879,7 @@ export function wireView(inst, app) {
       app.scheduleLight(); return;
     }
     if (ad.ctx) { ctxDrag(ad, e); return; }
-    if (ad.sun) { const v = viewPoint(ax, e); if (v) applySun(pickSun(S, v[0], v[1], domeProject())); return; }
+    if (ad.sun) { const v = viewPoint(ax, e), o = ad.off || [0, 0]; if (v) applySun(pickSun(S, v[0] + o[0], v[1] + o[1], domeProject())); return; }
     if (ad.rot) { const v = viewPoint(ax, e); if (v) turnTo(v); return; }
     const dx = e.clientX - ad.x, dy = e.clientY - ad.y;
     ad.x = e.clientX; ad.y = e.clientY;

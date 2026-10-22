@@ -65,6 +65,7 @@ body.simple .adv, body.simple .laygrp[data-grp="site"], body:not(.simple) .simpl
 .vbtns .vb svg, #dockFull svg{display:block}
 .vbtns .vb[data-vfull], #dockFull{display:inline-flex; align-items:center; justify-content:center}
 .minibtn.iconbtn{display:inline-flex; align-items:center; justify-content:center; padding:3px 6px; line-height:0}
+.masthead .modeseg{display:inline-flex; align-self:center}
 .modeseg button[aria-pressed="true"]{background:var(--ink); color:var(--panel); border-color:var(--ink)}
 .ctxmenu .popnote{display:block; margin:0 4px 6px; font-size:12px; color:var(--ink2); max-width:250px; line-height:1.35}
 /* the panel is empty: everything it held is on the drawings, their bars and small windows, and the settings bar */

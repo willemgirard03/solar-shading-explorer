@@ -495,6 +495,8 @@ export let axonCtxEdit = null;
 export let axonPlateEdit = null;
 /** the middle of the selected window's glass, in the world, for zooming to it */
 export let axonFocus = null;
+/** the sun's ray as last drawn, from the sun to where it meets the building: [sun, entry] on the sheet - null with the sun down or its layer off */
+export let axonRay = null;
 /** where the picked window's small window hangs: the selected window's middle */
 export let axonWinPop = null;
 /** the isolated window's grips as last drawn: [{ p, key, from, dir, mul }] - null when no window is isolated */
@@ -518,7 +520,7 @@ const unlabelled = s => s.replace(/<text\b[^>]*>[\s\S]*?<\/text>/g, '').replace(
 const GROUP_OF = Object.fromEntries(AX_LAYERS.map(([k, , gk]) => [k, gk]));
 export function drawAxon(F) {
   const { S, V, m, cur, sel } = F, AX = V.axcam;
-  axonWinPop = null; axonSiteLines = []; axonSiteMids = null; axonIso = null; axonIsoDevs = [];
+  axonWinPop = null; axonSiteLines = []; axonSiteMids = null; axonIso = null; axonIsoDevs = []; axonRay = null;
   // a window isolated: its own handles, and none of the building's
   // Advanced isolates the window to edit it; Simple edits the selected window and its shading where they stand
   const direct = S.mode === 'simple' && S.sel.unit !== null && (S.pick === 'window' || S.pick === 'device');
@@ -907,6 +909,7 @@ export function drawAxon(F) {
     const Psun = v3.mul(sv, Rdome), pS = P(Psun), pO0 = P([0, 0, 0]);
     const enter = blockEntry(Psun, v3.mul(sv, -1), S), pE = P(enter || [0, 0, 0]);
     g += L(pS[0], pS[1], pE[0], pE[1], { stroke: 'var(--sun)', w: 1.5, marker: 'url(#ar)' });
+    axonRay = [pS, pE];
     if (enter) g += L(pE[0], pE[1], pO0[0], pO0[1], { stroke: 'var(--sun)', w: .8, dash: '2 3', op: .45 });
     g += CIRCLE(pO0[0], pO0[1], 2.2, { fill: 'none', stroke: 'var(--sun)', 'stroke-width': .9 });
     g += CIRCLE(pS[0], pS[1], 11, { fill: 'var(--sun)', opacity: .18 });
