@@ -23,7 +23,7 @@ import { boxFaces } from '../geometry/boxes.js';
 import { bpoly, paintOrder, bspBuild, bspOrder, BSP_CAP } from '../geometry/bsp.js';
 import { openingFaces, GLASS_GROUP } from './opening.js';
 import { W, H, El, T, L, POLY, PATH, CIRCLE, RECT, TB, defsCommon, svg, paintFaces, mm, gripMark, bboxOf } from './svg.js';
-import { deviceEdit } from './devedit.js';
+import { deviceEdit, arrayMembers } from './devedit.js';
 import { AX_LAYERS } from '../view.js';
 import { hourly } from '../weather.js';
 import { isStreet, farCurb } from '../geometry/site.js';
@@ -381,7 +381,8 @@ function plateEdit(F, i, zb, cam, P) {
   const foot = [at(-hw, -hd, 0), at(hw, -hd, 0), at(hw, hd, 0), at(-hw, hd, 0)], roof = foot.map(q => [q[0], q[1], q[2] + h]);
   g += POLY(foot.map(P), { fill: 'none', stroke: 'var(--glass)', w: 1.4, dash: '5 3' }) + POLY(roof.map(P), { fill: 'none', stroke: 'var(--glass)', w: 1.4, dash: '5 3' });
   const faces = [], toward = n => n[0] * e[0] + n[1] * e[1] > 0.05;
-  for (const [key, n, u, v] of [['+x', ex, hw, 0], ['-x', [-ex[0], -ex[1]], -hw, 0], ['+y', ey, 0, hd], ['-y', [-ey[0], -ey[1]], 0, -hd]]) {
+  // its sides are not pushed or pulled in the view - its width and depth are typed - only its height is, from its roof
+  for (const [key, n, u, v] of []) {
     if (!toward(n)) continue;
     const Q = at(u, v, h / 2), q = P(Q), q1 = P([Q[0] + n[0], Q[1] + n[1], Q[2]]);
     faces.push({ key, p: q, sv: [q1[0] - q[0], q1[1] - q[1]], n: [n[0], n[1], 0] });
@@ -517,7 +518,9 @@ export function drawAxon(F) {
   const { S, V, m, cur, sel } = F, AX = V.axcam;
   axonWinPop = null; axonSiteLines = []; axonSiteMids = null; axonIso = null; axonIsoDevs = [];
   // a window isolated: its own handles, and none of the building's
-  const iso = !!(V.iso && F.sel.unit !== null && m.opening);
+  // Advanced isolates the window to edit it; Simple edits the selected window and its shading where they stand
+  const direct = S.mode === 'simple' && (S.pick === 'window' || S.pick === 'device');
+  const iso = !!((V.iso || direct) && F.sel.unit !== null && m.opening);
   let selPr = null, selO = null;
   // a layer shows when it is on and its group is on
   const Ly = Object.fromEntries(Object.entries(V.layers).map(([k, on]) => [k, on && (V.groups || {})[GROUP_OF[k]] !== false]));
@@ -821,19 +824,38 @@ export function drawAxon(F) {
      selected facade, at the floor of the selected window's storey, or with
      their pivot at the middle of the selected window's glass. */
   const angAt = V.angAt || 'ground', mo = m.opening;
-  let O0 = angAt === 'window' ? axonFocus.slice() : [sel.row.frame.O[0], sel.row.frame.O[1], angAt === 'level' ? sel.row.zb : 0], thR = null;
+  let O0 = angAt === 'window' ? axonFocus.slice() : [sel.row.frame.O[0], sel.row.frame.O[1], angAt === 'level' ? sel.row.zb : 0], thR = null, betaR = null;
   if ((angAt === 'sill' || angAt === 'cut') && mo) {
     let ev = mo.v0;
     if (angAt === 'cut' && cur.onFacade && cur.vsa > 0.6) {
       // each horizontal member's outer edge - furthest out, then lowest - as the section reads it; with none, the head at the wall face
       const edge = b => { let best = null; for (const [a, c] of [[1, 1], [1, -1], [-1, 1], [-1, -1]]) { const v = b.c[1] + a * b.h[1] * b.e2[1] + c * b.h[2] * b.e3[1], w = b.c[2] + a * b.h[1] * b.e2[2] + c * b.h[2] * b.e3[2]; if (!best || w > best[1] + 1e-9 || (Math.abs(w - best[1]) < 1e-9 && v < best[0])) best = [v, w]; } return best; };
-      const tT = Math.tan(cur.vsa * D2R), edges = (m.own || []).filter(b => b.kind === 'h').map(edge);
-      // the edge whose ray comes lowest down the glass sets where the sun is cut off
+      const tT = Math.tan(cur.vsa * D2R), hs = (m.own || []).filter(b => b.kind === 'h');
+      // the member whose outer edge's ray comes lowest down the glass sets where the sun is cut off
       let best = null;
-      for (const [pv, pw] of edges.length ? edges : [[mo.v1, m.reveal || 0]]) { const e = pv - pw * tT; if (!best || e < best.e) best = { e, pv, pw }; }
+      for (const b of hs.length ? hs : [null]) { const [pv, pw] = b ? edge(b) : [mo.v1, m.reveal || 0]; const e = pv - pw * tT; if (!best || e < best.e) best = { e, pv, pw, b }; }
       ev = best.e; thR = Math.max(1e-3, Math.hypot(best.pw, best.pv - ev));
+      /* the corner of its shadow: each end of that outer edge cast along the
+         sun onto the glass's plane, the one that falls nearest the window
+         taken - the sun's own ray from there passes the member's corner */
+      if (best.b) {
+        const cs = corners8(best.b), wMax = Math.max(...cs.map(c => c[2])), outer = cs.filter(c => c[2] > wMax - 1e-6), vMin = Math.min(...outer.map(c => c[1]));
+        const ends = outer.filter(c => c[1] < vMin + 1e-6), sl = cur.sl;
+        const away = u => u < mo.u0 ? mo.u0 - u : u > mo.u1 ? u - mo.u1 : 0, mid = (mo.u0 + mo.u1) / 2;
+        let pick = null;
+        for (const c of ends) {
+          const t = c[2] / sl[2], p = [c[0] - sl[0] * t, c[1] - sl[1] * t];
+          const k = away(p[0]) * 1e3 + Math.abs(p[0] - mid);
+          if (!pick || k < pick.k) pick = { k, p, c };
+        }
+        if (pick) {
+          O0 = toWorld(sel.row.frame, m.cc + pick.p[0], sel.row.zb + pick.p[1], 0, m.reveal || 0);
+          thR = Math.max(1e-3, Math.hypot(pick.c[2], pick.c[1] - pick.p[1]));
+          betaR = Math.hypot(pick.c[0] - pick.p[0], pick.c[1] - pick.p[1], pick.c[2]);
+        }
+      }
     }
-    O0 = toWorld(sel.row.frame, m.cc, sel.row.zb + ev, 0, m.reveal || 0);
+    if (!betaR) O0 = toWorld(sel.row.frame, m.cc, sel.row.zb + ev, 0, m.reveal || 0);
   }
   /* the sun-angle triangle, in the vertical plane square to the facade: the
      angle sits at its pivot and opens toward the sun.
@@ -923,7 +945,7 @@ export function drawAxon(F) {
       angle(mk, 'solaz', P(at(dirOf(180 + brg / 2), span * 0.62)), 'az', 'solar azimuth ' + fmt(brg, 1) + '°', 'from due south, east −', 'var(--sun)', 'sunAz', 8.5);
       // beta, in the vertical plane of the ray: its upper arm runs from the pivot toward the sun,
       // parallel to the sun's own ray, which reaches the ground elsewhere
-      g += PATH(pth([O, v3.add(O, v3.mul(sv, span * 0.62))]), { stroke: 'var(--sun)', w: 1.1 });
+      g += PATH(pth([O, v3.add(O, v3.mul(sv, betaR || span * 0.62))]), { stroke: 'var(--sun)', w: 1.1 });
       const rb = span * 0.30, ab = [];
       for (let i = 0; i <= 24; i++) { const t = cur.alt * D2R * i / 24; ab.push(at(gdir, rb * Math.cos(t), rb * Math.sin(t))); }
       mk = g.length;
@@ -974,7 +996,9 @@ export function drawAxon(F) {
     // the glass's set-back from the wall face, by a grip in the middle of the pane
     if (winEd) grips.push({ p: pr([um, vm, 0]), key: 'g.reveal', from: m.reveal || 0, dir: vec([um, vm, 0], [um, vm, -1]) });
     // the window's devices, each picked by a click on it; the picked one outlined
-    for (const b of m.own || []) if (b.sys !== undefined) axonIsoDevs.push({ i: b.sys, pts: hull(corners8(b).map(pr)), sel: b.D === F.selD });
+    const dU = vec([0, 0, 0], [1, 0, 0]), dV = vec([0, 0, 0], [0, 1, 0]), dW = vec([0, 0, 0], [0, 0, 1]);
+    const memV = arrayMembers(m, 'V', dV, dW), memU = arrayMembers(m, 'U', dU, dW);
+    for (const b of m.own || []) if (b.sys !== undefined) axonIsoDevs.push({ i: b.sys, pts: hull(corners8(b).map(pr)), sel: b.D === F.selD, mem: memV.get(b) || memU.get(b) || null });
     if (F.selD) for (const dv of axonIsoDevs) if ((m.own.find(b => b.sys === dv.i) || {}).D === F.selD) g += POLY(dv.pts, { fill: 'none', stroke: 'var(--glass)', w: 1.6 });
     /* the picked device edited as the section edits a blade and the plan a fin -
        its profile, turn, depth, array and gumball in the plane across it through
@@ -984,7 +1008,20 @@ export function drawAxon(F) {
       const D = F.selD, isH = D.dir === 'h', us = mine.map(b => b.c[0]), vs = mine.map(b => b.c[1]);
       const uM = (Math.min(...us) + Math.max(...us)) / 2, vM = (Math.min(...vs) + Math.max(...vs)) / 2;
       const PV = ([a, w]) => pr([uM, a, w]), PU = ([a, w]) => pr([a, vM, w]);
-      const one = deviceEdit({ P: isH ? PV : PU, ax: isH ? 'V' : 'U', drop: isH ? 0 : 1 }, D, mine, m, grips);
+      const one = deviceEdit({ P: isH ? PV : PU, ax: isH ? 'V' : 'U', drop: isH ? 0 : 1, noGum: true }, D, mine, m, grips);
+      {
+        const O = [one.pop.x, one.pop.y], offs = D.offOn ? D : { offU: 0, offV: 0 };
+        for (const [key, from, dir, col] of [['d.offU', offs.offU || 0, dU, '#c2412d'], ['d.offset', D.offset, dW, '#2f8a4e'], ['d.offV', offs.offV || 0, dV, '#2f6fd1']]) {
+          const l = Math.hypot(dir[0], dir[1]);
+          if (l < 1e-6) continue;
+          const ux = dir[0] / l, uy = dir[1] / l, tx = O[0] + 34 * ux, ty = O[1] + 34 * uy;
+          g += L(O[0] + 6 * ux, O[1] + 6 * uy, tx - 6 * ux, ty - 6 * uy, { stroke: col, w: 1.8 })
+            + POLY([[tx, ty], [tx - 10 * ux - 5 * uy, ty - 10 * uy + 5 * ux], [tx - 10 * ux + 5 * uy, ty - 10 * uy - 5 * ux]], { fill: col, stroke: col, w: .8 });
+          grips.push({ p: [tx - 4 * ux, ty - 4 * uy], key, from, dir, arrow: true, sgn: 1 });
+        }
+        grips.push({ p: O, pop: true });
+        g += CIRCLE(O[0], O[1], 5.5, { fill: 'var(--panel)', stroke: 'var(--ink2)', 'stroke-width': 1.4 }) + CIRCLE(O[0], O[1], 1.8, { fill: 'var(--ink2)' });
+      }
       const more = [], two = deviceEdit({ P: isH ? PU : PV, ax: isH ? 'U' : 'V', drop: isH ? 1 : 0, noGum: true }, D, mine, m, more);
       grips.push(...more.filter(gp => gp.key !== 'd.depth'));
       g += two.svg + one.svg;
@@ -999,7 +1036,7 @@ export function drawAxon(F) {
       g += lab(side, 'h ' + mm(m.winH), fillH ? undefined : 'g.winH', 34, 4);
       g += lab(pr([o.u0, o.v0, 0]), 'sill ' + mm(m.sill), 'g.sillK', -30, 14);
     }
-    g += T(12, 56, winEd ? 'window isolated: drag its jambs, sill and head, or the middle of the pane for its set-back · click a device to edit it · click a figure to type it · Esc or Done to finish'
+    g += T(12, 56, winEd ? (V.iso ? 'window isolated' : 'window selected') + ': drag its jambs, sill and head, or the middle of the pane for its set-back · click a device to edit it, or drag a member of an array to change how many · click a figure to type it' + (V.iso ? ' · Esc or Done to finish' : '')
       : 'device picked: drag its depth, turn, length and array, or its gumball (Alt-drag for a copy) · click the glass or Window for the window\'s own handles · Esc or Done to finish', { size: 8.5, fill: 'var(--glass)' });
     axonIso = grips;
   }

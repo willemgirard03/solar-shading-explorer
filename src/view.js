@@ -33,7 +33,7 @@ export const V = {
   groups: { sky: true, angles: true, ground: true },
   labels: { sky: true, angles: true, ground: true },
   /** how strongly each group and each layer is drawn, 0-1: a layer's own times its group's; one not named is drawn in full */
-  opac: { hours: 0.5 },
+  opac: { 'g:sky': 0.5 },
   /** the plan and the window in 3D show the selected window's bay alone, its sun on a floor left unseen - or the whole floor */
   whole: false,
   /** the plan's and the section's handles and typed figures, shown on request */

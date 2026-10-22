@@ -4247,7 +4247,7 @@ label.tipped{display:inline}
     groups: { sky: true, angles: true, ground: true },
     labels: { sky: true, angles: true, ground: true },
     /** how strongly each group and each layer is drawn, 0-1: a layer's own times its group's; one not named is drawn in full */
-    opac: { hours: 0.5 },
+    opac: { "g:sky": 0.5 },
     /** the plan and the window in 3D show the selected window's bay alone, its sun on a floor left unseen - or the whole floor */
     whole: false,
     /** the plan's and the section's handles and typed figures, shown on request */
@@ -7466,7 +7466,7 @@ label.tipped{display:inline}
     const foot = [at(-hw, -hd, 0), at(hw, -hd, 0), at(hw, hd, 0), at(-hw, hd, 0)], roof = foot.map((q) => [q[0], q[1], q[2] + h]);
     g += POLY(foot.map(P), { fill: "none", stroke: "var(--glass)", w: 1.4, dash: "5 3" }) + POLY(roof.map(P), { fill: "none", stroke: "var(--glass)", w: 1.4, dash: "5 3" });
     const faces = [], toward = (n) => n[0] * e[0] + n[1] * e[1] > 0.05;
-    for (const [key, n, u, v] of [["+x", ex, hw, 0], ["-x", [-ex[0], -ex[1]], -hw, 0], ["+y", ey, 0, hd], ["-y", [-ey[0], -ey[1]], 0, -hd]]) {
+    for (const [key, n, u, v] of []) {
       if (!toward(n)) continue;
       const Q = at(u, v, h / 2), q = P(Q), q1 = P([Q[0] + n[0], Q[1] + n[1], Q[2]]);
       faces.push({ key, p: q, sv: [q1[0] - q[0], q1[1] - q[1]], n: [n[0], n[1], 0] });
@@ -7591,7 +7591,8 @@ label.tipped{display:inline}
     axonSiteMids = null;
     axonIso = null;
     axonIsoDevs = [];
-    const iso = !!(V2.iso && F.sel.unit !== null && m.opening);
+    const direct = S2.mode === "simple" && (S2.pick === "window" || S2.pick === "device");
+    const iso = !!((V2.iso || direct) && F.sel.unit !== null && m.opening);
     let selPr = null, selO = null;
     const Ly = Object.fromEntries(Object.entries(V2.layers).map(([k, on]) => [k, on && (V2.groups || {})[GROUP_OF[k]] !== false]));
     const Lb = V2.labels || {};
@@ -7928,7 +7929,7 @@ label.tipped{display:inline}
     }
     g += over;
     const angAt = V2.angAt || "ground", mo = m.opening;
-    let O0 = angAt === "window" ? axonFocus.slice() : [sel.row.frame.O[0], sel.row.frame.O[1], angAt === "level" ? sel.row.zb : 0], thR = null;
+    let O0 = angAt === "window" ? axonFocus.slice() : [sel.row.frame.O[0], sel.row.frame.O[1], angAt === "level" ? sel.row.zb : 0], thR = null, betaR = null;
     if ((angAt === "sill" || angAt === "cut") && mo) {
       let ev = mo.v0;
       if (angAt === "cut" && cur.onFacade && cur.vsa > 0.6) {
@@ -7940,16 +7941,33 @@ label.tipped{display:inline}
           }
           return best2;
         };
-        const tT = Math.tan(cur.vsa * D2R), edges = (m.own || []).filter((b) => b.kind === "h").map(edge);
+        const tT = Math.tan(cur.vsa * D2R), hs = (m.own || []).filter((b) => b.kind === "h");
         let best = null;
-        for (const [pv, pw] of edges.length ? edges : [[mo.v1, m.reveal || 0]]) {
+        for (const b of hs.length ? hs : [null]) {
+          const [pv, pw] = b ? edge(b) : [mo.v1, m.reveal || 0];
           const e = pv - pw * tT;
-          if (!best || e < best.e) best = { e, pv, pw };
+          if (!best || e < best.e) best = { e, pv, pw, b };
         }
         ev = best.e;
         thR = Math.max(1e-3, Math.hypot(best.pw, best.pv - ev));
+        if (best.b) {
+          const cs = corners8(best.b), wMax = Math.max(...cs.map((c) => c[2])), outer = cs.filter((c) => c[2] > wMax - 1e-6), vMin = Math.min(...outer.map((c) => c[1]));
+          const ends = outer.filter((c) => c[1] < vMin + 1e-6), sl = cur.sl;
+          const away = (u) => u < mo.u0 ? mo.u0 - u : u > mo.u1 ? u - mo.u1 : 0, mid = (mo.u0 + mo.u1) / 2;
+          let pick2 = null;
+          for (const c of ends) {
+            const t = c[2] / sl[2], p = [c[0] - sl[0] * t, c[1] - sl[1] * t];
+            const k = away(p[0]) * 1e3 + Math.abs(p[0] - mid);
+            if (!pick2 || k < pick2.k) pick2 = { k, p, c };
+          }
+          if (pick2) {
+            O0 = toWorld(sel.row.frame, m.cc + pick2.p[0], sel.row.zb + pick2.p[1], 0, m.reveal || 0);
+            thR = Math.max(1e-3, Math.hypot(pick2.c[2], pick2.c[1] - pick2.p[1]));
+            betaR = Math.hypot(pick2.c[0] - pick2.p[0], pick2.c[1] - pick2.p[1], pick2.c[2]);
+          }
+        }
       }
-      O0 = toWorld(sel.row.frame, m.cc, sel.row.zb + ev, 0, m.reveal || 0);
+      if (!betaR) O0 = toWorld(sel.row.frame, m.cc, sel.row.zb + ev, 0, m.reveal || 0);
     }
     const mTri = mark();
     if (Ly.triangle) layer("triangle", () => {
@@ -8033,7 +8051,7 @@ label.tipped{display:inline}
         const azArc = pth(arcG(180, 180 + brg, span * 0.56));
         g += PATH(azArc, { stroke: "var(--sun)", w: 1, marker: "url(#ar)" }) + hit(azArc);
         angle(mk, "solaz", P(at(dirOf(180 + brg / 2), span * 0.62)), "az", "solar azimuth " + fmt(brg, 1) + "\xB0", "from due south, east \u2212", "var(--sun)", "sunAz", 8.5);
-        g += PATH(pth([O, v3.add(O, v3.mul(sv, span * 0.62))]), { stroke: "var(--sun)", w: 1.1 });
+        g += PATH(pth([O, v3.add(O, v3.mul(sv, betaR || span * 0.62))]), { stroke: "var(--sun)", w: 1.1 });
         const rb = span * 0.3, ab = [];
         for (let i = 0; i <= 24; i++) {
           const t = cur.alt * D2R * i / 24;
@@ -8093,7 +8111,9 @@ label.tipped{display:inline}
         grips.push({ p: pr([o.u0, vm, 0]), key: "g.winW", from: m.winW, dir: vec([o.u0, vm, 0], [o.u0 - 1, vm, 0]), mul: 2 });
       }
       if (winEd) grips.push({ p: pr([um, vm, 0]), key: "g.reveal", from: m.reveal || 0, dir: vec([um, vm, 0], [um, vm, -1]) });
-      for (const b of m.own || []) if (b.sys !== void 0) axonIsoDevs.push({ i: b.sys, pts: hull(corners8(b).map(pr)), sel: b.D === F.selD });
+      const dU = vec([0, 0, 0], [1, 0, 0]), dV = vec([0, 0, 0], [0, 1, 0]), dW = vec([0, 0, 0], [0, 0, 1]);
+      const memV = arrayMembers(m, "V", dV, dW), memU = arrayMembers(m, "U", dU, dW);
+      for (const b of m.own || []) if (b.sys !== void 0) axonIsoDevs.push({ i: b.sys, pts: hull(corners8(b).map(pr)), sel: b.D === F.selD, mem: memV.get(b) || memU.get(b) || null });
       if (F.selD) {
         for (const dv of axonIsoDevs) if ((m.own.find((b) => b.sys === dv.i) || {}).D === F.selD) g += POLY(dv.pts, { fill: "none", stroke: "var(--glass)", w: 1.6 });
       }
@@ -8102,7 +8122,19 @@ label.tipped{display:inline}
         const D = F.selD, isH = D.dir === "h", us = mine.map((b) => b.c[0]), vs = mine.map((b) => b.c[1]);
         const uM = (Math.min(...us) + Math.max(...us)) / 2, vM = (Math.min(...vs) + Math.max(...vs)) / 2;
         const PV = ([a, w]) => pr([uM, a, w]), PU = ([a, w]) => pr([a, vM, w]);
-        const one = deviceEdit({ P: isH ? PV : PU, ax: isH ? "V" : "U", drop: isH ? 0 : 1 }, D, mine, m, grips);
+        const one = deviceEdit({ P: isH ? PV : PU, ax: isH ? "V" : "U", drop: isH ? 0 : 1, noGum: true }, D, mine, m, grips);
+        {
+          const O = [one.pop.x, one.pop.y], offs = D.offOn ? D : { offU: 0, offV: 0 };
+          for (const [key, from, dir, col] of [["d.offU", offs.offU || 0, dU, "#c2412d"], ["d.offset", D.offset, dW, "#2f8a4e"], ["d.offV", offs.offV || 0, dV, "#2f6fd1"]]) {
+            const l = Math.hypot(dir[0], dir[1]);
+            if (l < 1e-6) continue;
+            const ux = dir[0] / l, uy = dir[1] / l, tx = O[0] + 34 * ux, ty = O[1] + 34 * uy;
+            g += L(O[0] + 6 * ux, O[1] + 6 * uy, tx - 6 * ux, ty - 6 * uy, { stroke: col, w: 1.8 }) + POLY([[tx, ty], [tx - 10 * ux - 5 * uy, ty - 10 * uy + 5 * ux], [tx - 10 * ux + 5 * uy, ty - 10 * uy - 5 * ux]], { fill: col, stroke: col, w: 0.8 });
+            grips.push({ p: [tx - 4 * ux, ty - 4 * uy], key, from, dir, arrow: true, sgn: 1 });
+          }
+          grips.push({ p: O, pop: true });
+          g += CIRCLE(O[0], O[1], 5.5, { fill: "var(--panel)", stroke: "var(--ink2)", "stroke-width": 1.4 }) + CIRCLE(O[0], O[1], 1.8, { fill: "var(--ink2)" });
+        }
         const more = [], two = deviceEdit({ P: isH ? PU : PV, ax: isH ? "U" : "V", drop: isH ? 1 : 0, noGum: true }, D, mine, m, more);
         grips.push(...more.filter((gp) => gp.key !== "d.depth"));
         g += two.svg + one.svg;
@@ -8116,7 +8148,7 @@ label.tipped{display:inline}
         g += lab(side, "h " + mm(m.winH), fillH ? void 0 : "g.winH", 34, 4);
         g += lab(pr([o.u0, o.v0, 0]), "sill " + mm(m.sill), "g.sillK", -30, 14);
       }
-      g += T(12, 56, winEd ? "window isolated: drag its jambs, sill and head, or the middle of the pane for its set-back \xB7 click a device to edit it \xB7 click a figure to type it \xB7 Esc or Done to finish" : "device picked: drag its depth, turn, length and array, or its gumball (Alt-drag for a copy) \xB7 click the glass or Window for the window's own handles \xB7 Esc or Done to finish", { size: 8.5, fill: "var(--glass)" });
+      g += T(12, 56, winEd ? (V2.iso ? "window isolated" : "window selected") + ": drag its jambs, sill and head, or the middle of the pane for its set-back \xB7 click a device to edit it, or drag a member of an array to change how many \xB7 click a figure to type it" + (V2.iso ? " \xB7 Esc or Done to finish" : "") : "device picked: drag its depth, turn, length and array, or its gumball (Alt-drag for a copy) \xB7 click the glass or Window for the window's own handles \xB7 Esc or Done to finish", { size: 8.5, fill: "var(--glass)" });
       axonIso = grips;
     }
     axonPlateEdit = null;
@@ -8353,7 +8385,7 @@ label.tipped{display:inline}
     const words = ax === "V" ? ["Top", "Middle", "Bottom"] : ["Left", "Middle", "Right"], A = D.arr, along = A && A.along !== "out", out = A && A.along === "out";
     const seg3 = popSeg, grp = popGrp, three = ["start", "centre", "end"].map((v, i) => [v, words[i]]);
     let s = o.simple ? popHead(D.name || deviceLabel(D), min) : popHeadName("d.name", D.name || deviceLabel(D), min, "", { kind: "device", opts: o.devOpts, cur: D.id });
-    if (o.axon) s += `<div class="dvrow">${popBtn("isoWinPick", "", "\u2039 Window", "Back to the window: its own handles and pop-over")}${popBtn("isoWin", "", "Done", "Back to the whole building (Esc)", "on")}</div>`;
+    if (o.axon) s += `<div class="dvrow">${popBtn("isoWinPick", "", "\u2039 Window", "Back to the window: its own handles and pop-over")}${o.iso ? popBtn("isoWin", "", "Done", "Back to the whole building (Esc)", "on") : ""}</div>`;
     const alignTip = arrayView && A && !out ? "Move the device so its " + (ax === "U" ? "outermost fin\u2019s hinge" : "outermost member\u2019s hinge") + " sits on the window\u2019s edge - or its middle on the window\u2019s middle. A move, made once." : arrayView ? "Move the member so its hinge sits on the window\u2019s edge, or its middle. A move, made once." : "Move the member so its end sits on the window\u2019s edge - or its middle on the window\u2019s middle. A move, made once.";
     s += grp("Align", alignTip, seg3("d.align" + ax, three));
     if (arrayView) {
@@ -11104,7 +11136,7 @@ entering            q \xD7 sunlit glass area \xD7 SHGC   W</div>
         return;
       }
       if (ad) return;
-      const v = viewPoint(ax, e), isoG = V2.iso && v && isoAt(v), pa = !V2.iso && v && plateAt(v), at = !pa && !V2.iso && v && ctxAt(v);
+      const v = viewPoint(ax, e), isoG = inst.h.iso && v && isoAt(v), pa = !V2.iso && v && plateAt(v), at = !pa && !V2.iso && v && ctxAt(v);
       if (isoG) {
         ax.style.cursor = "grab";
         return;
@@ -11147,7 +11179,7 @@ entering            q \xD7 sunlit glass area \xD7 SHGC   W</div>
         return;
       }
       const v = viewPoint(ax, e);
-      if (V2.iso && v && e.button === 0 && !e.shiftKey) {
+      if (inst.h.iso && v && e.button === 0 && !e.shiftKey) {
         let gp = isoAt(v);
         if (gp && gp.key && gp.key.startsWith("g.") && (inst.h.isoDevs || []).some((d) => !d.sel && inside(d.pts, v[0], v[1]))) gp = null;
         if (gp && gp.pop) {
@@ -11167,6 +11199,17 @@ entering            q \xD7 sunlit glass area \xD7 SHGC   W</div>
             snap: gp.key === "d.depth" ? depthSnapOf(S2) : null,
             angs: gp.rot ? angleSnapsOf(S2) : null
           };
+          try {
+            ax.setPointerCapture(e.pointerId);
+          } catch (_) {
+          }
+          ax.classList.add("drag");
+          e.preventDefault();
+          return;
+        }
+        const md = (inst.h.isoDevs || []).filter((d) => d.mem && inside(d.pts, v[0], v[1])).pop();
+        if (md) {
+          ad = { isoMem: md, v0: v, moved: false };
           try {
             ax.setPointerCapture(e.pointerId);
           } catch (_) {
@@ -11253,6 +11296,23 @@ entering            q \xD7 sunlit glass area \xD7 SHGC   W</div>
     ax.addEventListener("pointermove", (e) => {
       if (!ad) return;
       if (ad.isoPop) return;
+      if (ad.isoMem) {
+        const v = viewPoint(ax, e);
+        if (!v) return;
+        if (!ad.moved) {
+          if (Math.hypot(v[0] - ad.v0[0], v[1] - ad.v0[1]) < 3) return;
+          ad.moved = true;
+          app.stopPlay();
+          app.pick(ad.isoMem.i, inst);
+          H3.mark("grip:member");
+        }
+        const h = ad.isoMem.mem, s = h.dA, d2 = s[0] * s[0] + s[1] * s[1] || 1, a = h.a0 + ((v[0] - ad.v0[0]) * s[0] + (v[1] - ad.v0[1]) * s[1]) / d2;
+        const sp = Math.max(0.02, h.idx > 0 ? (a - h.first) * h.sd / h.idx : (h.last - a) * h.sd / (h.n - 1));
+        if (h.mode === "count") setValue("a.count", clamp(Math.round(h.L / sp) + 1, 2, 200), S2);
+        else setValue("a.spacing", Math.min(3, Math.round(sp / 5e-3) * 5e-3), S2);
+        app.scheduleLight();
+        return;
+      }
       if (ad.iso) {
         const v = viewPoint(ax, e);
         if (!v) return;
@@ -11357,6 +11417,11 @@ entering            q \xD7 sunlit glass area \xD7 SHGC   W</div>
         app.togglePop(inst);
         return;
       }
+      if (was.isoMem) {
+        if (was.moved) app.schedule();
+        else app.pick(was.isoMem.i, inst);
+        return;
+      }
       if (was.iso) {
         const g = was.iso;
         if ((g.arrow || g.rot) && was.travel < 3 && e.type === "pointerup") {
@@ -11406,6 +11471,13 @@ entering            q \xD7 sunlit glass area \xD7 SHGC   W</div>
           if (gl) app.selectWindow(gl.f, gl.st, gl.unit);
           else app.pick(null, inst);
           return;
+        }
+        if (inst.h.iso) {
+          const dv = (inst.h.isoDevs || []).filter((d) => inside(d.pts, was.v[0], was.v[1]));
+          if (dv.length) {
+            app.pick(dv[dv.length - 1].i, inst);
+            return;
+          }
         }
         if (hit) app.selectPlate(hit.f, hit.st, hit.unit);
         else {
@@ -12033,7 +12105,7 @@ entering            q \xD7 sunlit glass area \xD7 SHGC   W</div>
   }
   function devPop(inst, F) {
     if (inst !== POP.at) return;
-    const isoOn = inst.type === "axon" && !!inst.V.iso;
+    const isoOn = inst.type === "axon" && (!!inst.V.iso || S.mode === "simple" && (S.pick === "window" || S.pick === "device"));
     const P = inst.h.pop, has = !!selCell(), isWin = !!(P && (P.kind === "window" || P.kind === "wall") && (F.pick === "window" || isoOn && !F.selD || !has && S.pick === "window"));
     if (!(P && (isWin || F.selD) && POP.st !== "closed")) {
       hideWidget(POP);
@@ -12061,8 +12133,8 @@ entering            q \xD7 sunlit glass area \xD7 SHGC   W</div>
         side: S.sel.f + " side",
         st: S.sel.st,
         live: !!(S.live && S.live.f === S.sel.f && S.live.st === S.sel.st),
-        axon: inst.type === "axon",
-        iso: isoOn,
+        axon: inst.type === "axon" && S.mode !== "simple",
+        iso: !!inst.V.iso,
         sysName: entryName(S, "systems", r.sys),
         unitName: u ? entryName(S, "units", u.id) : "",
         brk: b,
@@ -12082,6 +12154,7 @@ entering            q \xD7 sunlit glass area \xD7 SHGC   W</div>
       more: POP.more,
       axon: isoOn,
       both: isoOn,
+      iso: !!inst.V.iso,
       grpName: (selShading(S) || {}).name || "Shading group",
       grpId: (selShading(S) || {}).id,
       grpOpts: libOf("shading").map((x) => [x.id, x.name || "Shading group"]),
@@ -13062,7 +13135,7 @@ entering            q \xD7 sunlit glass area \xD7 SHGC   W</div>
       }
     },
     pickDev: (a) => {
-      if (POP.at && POP.at.type === "axon" && POP.at.V.iso) {
+      if (POP.at && POP.at.type === "axon" && (POP.at.V.iso || S.mode === "simple")) {
         if (S.live) return;
         const r = selCell();
         if (r) r.dev = +a;
@@ -13716,7 +13789,7 @@ entering            q \xD7 sunlit glass area \xD7 SHGC   W</div>
   var TOUR = [
     { title: "Calculation settings", at: "#calcBar", html: "<p>The date, the time and the clock. <b>Solar time</b> is the sun\u2019s own: noon is when it stands due south, as sun charts are drawn; the other clocks are Vancouver\u2019s, standard and daylight.</p><p>The sky and the weather file set how much sun there is to keep out. <b>Simple</b> keeps to one storey with one window a side; <b>Advanced</b> opens storeys, sites and a library of designs.</p>" },
     { title: "Building in 3D", at: VIEW_AT("axon"), html: "<p>Drag the sun on the dome to move it through the sky. Turn the building by the long arrow on the ground: its figure is the selected side\u2019s surface azimuth, measured from due south, east negative.</p><p>Click a window to select it. The angles at its foot - \u03B2, the solar azimuth, \u03B3 and \u03B8 - show their value and working when the pointer is over them. <b>Layers</b> sets what the sky shows, and how strongly.</p>" },
-    { title: "The window pop-over", at: VIEW_AT("axon"), html: "<p>A selected window opens a pop-over beside it: add horizontal or vertical shading, or a preset.</p><p><b>Edit window in 3D</b> isolates the window: pull its jambs, sill and head, and the middle of the pane for its set-back; click a device to edit it as the section and plan do - its depth, turn, array and gumball. Alt-drag the gumball to leave a copy behind. Esc or Done brings the building back.</p>" },
+    { title: "The window pop-over", at: VIEW_AT("axon"), html: "<p>A selected window opens a pop-over beside it: add horizontal or vertical shading, or a preset.</p><p>In <b>Simple</b> the window\u2019s handles show as soon as it is selected - its jambs, sill and head, and the middle of the pane for its set-back; in <b>Advanced</b>, <b>Edit window in 3D</b> isolates it first. Click a device to edit it as the section and plan do: its depth, turn and length, a gumball that moves it along, out from and up the facade (Alt-drag for a copy), and its alignment, justification and hinge in its pop-over. Drag a member of an array to change how many there are.</p>" },
     { title: "Section and plan", at: VIEW_AT("section"), html: "<p>The section reads the profile angle \u03B8; the plan reads \u03B3 and the sun on the floor. Click a device to pick it, then drag its grips, or click a figure to type it. Alt-drag its gumball for a copy.</p><p>Pulling a device\u2019s depth, or turning it, snaps where its end falls on the sun\u2019s angle line now - where it just shades the window at this instant.</p>" },
     { title: "Sun path chart", at: VIEW_AT("sun"), html: "<p>The sun\u2019s bearing and altitude over the day, with the shading the window\u2019s devices give drawn in grey: the solid line is the cut-off as built, the dashed one the same devices taken as long and thin, as a protractor reads them. The pointer\u2019s \u03B2, azimuth, \u03B3 and \u03B8 are read at the top right.</p><p>The weather dots are each hour of the weather file, coloured by its temperature: keep the warm ones out, let the cool ones in. <b>Shade from chart</b> sizes shading from cut-offs dragged here.</p>" },
     { title: "Live shading", at: VIEW_AT("section"), html: "<p><b>Live shading</b> puts the ideal members on the selected window for the date and time set, and remakes them as they change. Choose horizontal, vertical, an egg-crate or a louvred canopy, or let Auto pick, and how many members share the work.</p><p><b>Compare</b> keeps this moment\u2019s members as a ghost while another is set; pressed again, the ghost goes and the clock returns to its moment. Turn it off to keep the shading, or put back what the window had.</p>" },

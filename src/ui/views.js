@@ -102,7 +102,7 @@ function deviceBody(D, ax, arrayView, min, o = {}) {
   const words = ax === 'V' ? ['Top', 'Middle', 'Bottom'] : ['Left', 'Middle', 'Right'], A = D.arr, along = A && A.along !== 'out', out = A && A.along === 'out';
   const seg = popSeg, grp = popGrp, three = ['start', 'centre', 'end'].map((v, i) => [v, words[i]]);
   let s = o.simple ? popHead(D.name || deviceLabel(D), min) : popHeadName('d.name', D.name || deviceLabel(D), min, '', { kind: 'device', opts: o.devOpts, cur: D.id });
-  if (o.axon) s += `<div class="dvrow">${popBtn('isoWinPick', '', '‹ Window', 'Back to the window: its own handles and pop-over')}${popBtn('isoWin', '', 'Done', 'Back to the whole building (Esc)', 'on')}</div>`;
+  if (o.axon) s += `<div class="dvrow">${popBtn('isoWinPick', '', '‹ Window', 'Back to the window: its own handles and pop-over')}${o.iso ? popBtn('isoWin', '', 'Done', 'Back to the whole building (Esc)', 'on') : ''}</div>`;
   const alignTip = arrayView && A && !out ? 'Move the device so its ' + (ax === 'U' ? 'outermost fin’s hinge' : 'outermost member’s hinge') + ' sits on the window’s edge - or its middle on the window’s middle. A move, made once.'
     : arrayView ? 'Move the member so its hinge sits on the window’s edge, or its middle. A move, made once.' : 'Move the member so its end sits on the window’s edge - or its middle on the window’s middle. A move, made once.';
   s += grp('Align', alignTip, seg('d.align' + ax, three));

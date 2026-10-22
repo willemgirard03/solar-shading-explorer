@@ -285,7 +285,8 @@ function devPop(inst, F) {
   if (inst !== POP.at) return;
   // a bare side has no window for the frame to carry the pick on: the pick itself says so
   // isolated in the building view, the window's own small window stays - a device picked from it is pulled there
-  const isoOn = inst.type === 'axon' && !!inst.V.iso;
+  // Simple edits the selected window in the building view where it stands, as Advanced does once it is isolated
+  const isoOn = inst.type === 'axon' && (!!inst.V.iso || (S.mode === 'simple' && (S.pick === 'window' || S.pick === 'device')));
   const P = inst.h.pop, has = !!selCell(), isWin = !!(P && (P.kind === 'window' || P.kind === 'wall') && (F.pick === 'window' || (isoOn && !F.selD) || (!has && S.pick === 'window')));
   if (!(P && (isWin || F.selD) && POP.st !== 'closed')) { hideWidget(POP); return; }
   const min = POP.st === 'min';
@@ -298,12 +299,12 @@ function devPop(inst, F) {
     const r = selCell(), u = selUnitType(), b = brkInfo(F), row = F.B && F.B.facades[S.sel.f] && F.B.facades[S.sel.f].rows[S.sel.st], nU = row && row.units ? row.units.length : 1;
     html = windowPopHTML(F.m, min, { simple: S.mode === 'simple', view3d: view3d(inst.type), mode: inst.type === 'axon' && picked === 'wall' && S.mode !== 'simple' ? 'facade' : 'window', more: POP.more,
       title: 'Window ' + (selUnitIndex(S) + 1) + (nU > 1 ? ' of ' + nU : ''), devs: shadingDevs(), cur: r.dev || 0, add: addGroups('both'), side: S.sel.f + ' side', st: S.sel.st,
-      live: !!(S.live && S.live.f === S.sel.f && S.live.st === S.sel.st), axon: inst.type === 'axon', iso: isoOn,
+      live: !!(S.live && S.live.f === S.sel.f && S.live.st === S.sel.st), axon: inst.type === 'axon' && S.mode !== 'simple', iso: !!inst.V.iso,
       sysName: entryName(S, 'systems', r.sys), unitName: u ? entryName(S, 'units', u.id) : '', brk: b,
       grpName: (selShading(S) || {}).name || 'Shading group', grpId: (selShading(S) || {}).id, grpOpts: libOf('shading').map(x => [x.id, x.name || 'Shading group']),
       sysId: r.sys, winOpts: libOf('systems').map(y => [y.id, y.name || 'Window group']),
       arr: getValue('g.arrOn'), by: getValue('g.arrBy'), sides: getValue('matchSides'), up: getValue('matchGlazing'), above: S.sel.st < S.storeys.length - 1 });
-  } else html = devicePopHTML(F.selD, P.ax, P.arrayView, min, { simple: S.mode === 'simple', more: POP.more, axon: isoOn, both: isoOn, grpName: (selShading(S) || {}).name || 'Shading group', grpId: (selShading(S) || {}).id,
+  } else html = devicePopHTML(F.selD, P.ax, P.arrayView, min, { simple: S.mode === 'simple', more: POP.more, axon: isoOn, both: isoOn, iso: !!inst.V.iso, grpName: (selShading(S) || {}).name || 'Shading group', grpId: (selShading(S) || {}).id,
     grpOpts: libOf('shading').map(x => [x.id, x.name || 'Shading group']), devOpts: libOf('devices').filter(D => D.dir === F.selD.dir).map(D => [D.id, D.name || deviceLabel(D)]) });
   // in the site view, to the window's left, clear of the storey's own small window on its right
   showWidget(POP, html, { x: P.x, y: P.y, box: P.box, side: inst.type === 'axon' ? 'left' : 'right', mid: inst.type === 'axon' });
@@ -997,7 +998,7 @@ const ACTS = {
   },
   pickDev: a => {
     // isolated in the building view, the device is picked there, to pull its depth by its tip
-    if (POP.at && POP.at.type === 'axon' && POP.at.V.iso) { if (S.live) return; const r = selCell(); if (r) r.dev = +a; S.pick = 'device'; return; }
+    if (POP.at && POP.at.type === 'axon' && (POP.at.V.iso || S.mode === 'simple')) { if (S.live) return; const r = selCell(); if (r) r.dev = +a; S.pick = 'device'; return; }
     const h = selShading(S), D = h && S.lib.devices[h.devices[+a]], want = D && D.dir === 'v' ? 'plan' : 'section';
     pickOnly(+a, insts().find(x => x.type === want) || insts().find(x => x.type === 'section' || x.type === 'plan') || null);
   },
@@ -1366,7 +1367,7 @@ const VIEW_AT = t => () => document.querySelector('.view[data-type=' + t + ']');
 const TOUR = [
   { title: 'Calculation settings', at: '#calcBar', html: '<p>The date, the time and the clock. <b>Solar time</b> is the sun’s own: noon is when it stands due south, as sun charts are drawn; the other clocks are Vancouver’s, standard and daylight.</p><p>The sky and the weather file set how much sun there is to keep out. <b>Simple</b> keeps to one storey with one window a side; <b>Advanced</b> opens storeys, sites and a library of designs.</p>' },
   { title: 'Building in 3D', at: VIEW_AT('axon'), html: '<p>Drag the sun on the dome to move it through the sky. Turn the building by the long arrow on the ground: its figure is the selected side’s surface azimuth, measured from due south, east negative.</p><p>Click a window to select it. The angles at its foot - β, the solar azimuth, γ and θ - show their value and working when the pointer is over them. <b>Layers</b> sets what the sky shows, and how strongly.</p>' },
-  { title: 'The window pop-over', at: VIEW_AT('axon'), html: '<p>A selected window opens a pop-over beside it: add horizontal or vertical shading, or a preset.</p><p><b>Edit window in 3D</b> isolates the window: pull its jambs, sill and head, and the middle of the pane for its set-back; click a device to edit it as the section and plan do - its depth, turn, array and gumball. Alt-drag the gumball to leave a copy behind. Esc or Done brings the building back.</p>' },
+  { title: 'The window pop-over', at: VIEW_AT('axon'), html: '<p>A selected window opens a pop-over beside it: add horizontal or vertical shading, or a preset.</p><p>In <b>Simple</b> the window’s handles show as soon as it is selected - its jambs, sill and head, and the middle of the pane for its set-back; in <b>Advanced</b>, <b>Edit window in 3D</b> isolates it first. Click a device to edit it as the section and plan do: its depth, turn and length, a gumball that moves it along, out from and up the facade (Alt-drag for a copy), and its alignment, justification and hinge in its pop-over. Drag a member of an array to change how many there are.</p>' },
   { title: 'Section and plan', at: VIEW_AT('section'), html: '<p>The section reads the profile angle θ; the plan reads γ and the sun on the floor. Click a device to pick it, then drag its grips, or click a figure to type it. Alt-drag its gumball for a copy.</p><p>Pulling a device’s depth, or turning it, snaps where its end falls on the sun’s angle line now - where it just shades the window at this instant.</p>' },
   { title: 'Sun path chart', at: VIEW_AT('sun'), html: '<p>The sun’s bearing and altitude over the day, with the shading the window’s devices give drawn in grey: the solid line is the cut-off as built, the dashed one the same devices taken as long and thin, as a protractor reads them. The pointer’s β, azimuth, γ and θ are read at the top right.</p><p>The weather dots are each hour of the weather file, coloured by its temperature: keep the warm ones out, let the cool ones in. <b>Shade from chart</b> sizes shading from cut-offs dragged here.</p>' },
   { title: 'Live shading', at: VIEW_AT('section'), html: '<p><b>Live shading</b> puts the ideal members on the selected window for the date and time set, and remakes them as they change. Choose horizontal, vertical, an egg-crate or a louvred canopy, or let Auto pick, and how many members share the work.</p><p><b>Compare</b> keeps this moment’s members as a ghost while another is set; pressed again, the ghost goes and the clock returns to its moment. Turn it off to keep the shading, or put back what the window had.</p>' },

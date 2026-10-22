@@ -738,7 +738,7 @@ export function wireView(inst, app) {
     ax.classList.toggle('placing', !!V.place.on);
     if (V.place.on && !ad) { const p = groundAt(e); if (p) { V.place.P = p; app.paint(inst); } return; }
     if (ad) return;
-    const v = viewPoint(ax, e), isoG = V.iso && v && isoAt(v), pa = !V.iso && v && plateAt(v), at = !pa && !V.iso && v && ctxAt(v);
+    const v = viewPoint(ax, e), isoG = inst.h.iso && v && isoAt(v), pa = !V.iso && v && plateAt(v), at = !pa && !V.iso && v && ctxAt(v);
     if (isoG) { ax.style.cursor = 'grab'; return; }
     ax.classList.toggle('rot', !at && !pa && !V.iso && onHandle(v));
     const k = pa ? pa.kind : at ? at.kind : v && siteLineAt(v) ? 'site' : null;
@@ -760,7 +760,7 @@ export function wireView(inst, app) {
     if (V.place.on && e.button === 0) { const p = groundAt(e); if (p) app.placeContext(p); e.preventDefault(); return; }
     const v = viewPoint(ax, e);
     // a window isolated: its grips - its devices' among them - and nothing of the building's
-    if (V.iso && v && e.button === 0 && !e.shiftKey) {
+    if (inst.h.iso && v && e.button === 0 && !e.shiftKey) {
       let gp = isoAt(v);
       // a device not yet picked, pressed where a grip of the window's own lies over it, is a click on the device
       if (gp && gp.key && gp.key.startsWith('g.') && (inst.h.isoDevs || []).some(d => !d.sel && inside(d.pts, v[0], v[1]))) gp = null;
@@ -772,6 +772,9 @@ export function wireView(inst, app) {
           snap: gp.key === 'd.depth' ? depthSnapOf(S) : null, angs: gp.rot ? angleSnapsOf(S) : null };
         try { ax.setPointerCapture(e.pointerId); } catch (_) { } ax.classList.add('drag'); e.preventDefault(); return;
       }
+      // a member of an array pressed: dragged, it sets how many there are, or how far apart; let go where it was, it is picked
+      const md = (inst.h.isoDevs || []).filter(d => d.mem && inside(d.pts, v[0], v[1])).pop();
+      if (md) { ad = { isoMem: md, v0: v, moved: false }; try { ax.setPointerCapture(e.pointerId); } catch (_) { } ax.classList.add('drag'); e.preventDefault(); return; }
     }
     if (v && e.button === 0 && !e.shiftKey && !V.iso) {
       const pa = plateAt(v);
@@ -809,6 +812,18 @@ export function wireView(inst, app) {
   ax.addEventListener('pointermove', e => {
     if (!ad) return;
     if (ad.isoPop) return;
+    if (ad.isoMem) {
+      const v = viewPoint(ax, e); if (!v) return;
+      if (!ad.moved) {
+        if (Math.hypot(v[0] - ad.v0[0], v[1] - ad.v0[1]) < 3) return;
+        ad.moved = true; app.stopPlay(); app.pick(ad.isoMem.i, inst); H.mark('grip:member');
+      }
+      const h = ad.isoMem.mem, s = h.dA, d2 = s[0] * s[0] + s[1] * s[1] || 1, a = h.a0 + ((v[0] - ad.v0[0]) * s[0] + (v[1] - ad.v0[1]) * s[1]) / d2;
+      const sp = Math.max(0.02, h.idx > 0 ? (a - h.first) * h.sd / h.idx : (h.last - a) * h.sd / (h.n - 1));
+      if (h.mode === 'count') setValue('a.count', clamp(Math.round(h.L / sp) + 1, 2, 200), S);
+      else setValue('a.spacing', Math.min(3, Math.round(sp / 0.005) * 0.005), S);
+      app.scheduleLight(); return;
+    }
     if (ad.iso) {
       // pulled along its own axis, to the nearest 5 mm, or turned about its hinge a degree at a time - each snapping to the sun now
       const v = viewPoint(ax, e); if (!v) return;
@@ -867,6 +882,7 @@ export function wireView(inst, app) {
     try { ax.releasePointerCapture(e.pointerId); } catch (_) { }
     // isolated: the gumball's centre opens the window's pop-over; an arrow or the arc clicked asks how far; an array let go settles
     if (was.isoPop) { app.togglePop(inst); return; }
+    if (was.isoMem) { if (was.moved) app.schedule(); else app.pick(was.isoMem.i, inst); return; }
     if (was.iso) {
       const g = was.iso;
       if ((g.arrow || g.rot) && was.travel < 3 && e.type === 'pointerup') { app.nudge(g, e.clientX, e.clientY); return; }
@@ -903,6 +919,7 @@ export function wireView(inst, app) {
         if (gl) app.selectWindow(gl.f, gl.st, gl.unit); else app.pick(null, inst);
         return;
       }
+      if (inst.h.iso) { const dv = (inst.h.isoDevs || []).filter(d => inside(d.pts, was.v[0], was.v[1])); if (dv.length) { app.pick(dv[dv.length - 1].i, inst); return; } }
       if (hit) app.selectPlate(hit.f, hit.st, hit.unit);
       else { app.endPlate(); app.schedule(); }
     }
