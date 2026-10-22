@@ -238,6 +238,8 @@ export function sitePopHTML(min, o) {
     + `<div class="dvrow">${popBtn('siteRotate', '', 'Rotate 90° ↻', 'Every side’s condition handed on to the next side round, clockwise: north’s to east, east’s to south, south’s to west, west’s to north')}</div>`
     + `<div class="dvnote">Push and pull its lines in the view by their grips; click a figure to type it.</div>`;
 }
+/** the weather dots' menu: its name shown, the span in use ticked among the choices */
+export const dotsOpts = cur => `<option value="" hidden selected>Weather dots</option>` + Object.entries(DOT_SPANS).map(([k, l]) => `<option value="${k}">${k === cur ? '✓ ' : '\u2003'}${l}</option>`).join('');
 const opts = (o, sel) => Object.entries(o).map(([k, l]) => `<option value="${k}"${k === sel ? ' selected' : ''}>${l}</option>`).join('');
 /** a layer's or a group's opacity on the Layers menu: dragged sideways, or clicked and typed */
 const opv = (k, v) => `<span class="opv" data-opk="${k}" tabindex="0" title="Opacity: drag left or right, or click to type">${Math.round(((v.opac || {})[k] ?? 1) * 100)}%</span>`;
@@ -257,7 +259,7 @@ const SAVE = `<span class="wpick adv"><select class="winSel" title="Selected win
 function controls(type, v) {
   switch (type) {
     case 'sun': return `<div class="seg mini sunModes"><button type="button" data-sm="path" aria-pressed="true" title="Sun positions by bearing and altitude">Sun path</button><button type="button" data-sm="year" aria-pressed="false" title="The same shading by day of the year and time of day; click or drag to set the date and time">Year</button></div>
-      <label class="barsel wxdots" title="Each daylit hour of the weather file, coloured by its temperature - cool below 20 °C, comfortable to 27 °C, warm above - at the sun’s place in the middle of that hour. The file’s hours are standard time (PST), so the dots sit between the hour lines, and drift round the solar hours over the year.">Weather dots <select class="dotsSel">${opts(DOT_SPANS, v.dots)}</select></label>
+      <label class="barsel wxdots" title="Each daylit hour of the weather file, coloured by its temperature - cool below 20 °C, comfortable to 27 °C, warm above - at the sun’s place in the middle of that hour. The file’s hours are standard time (PST), so the dots sit between the hour lines, and drift round the solar hours over the year."><select class="dotsSel" aria-label="Weather dots">${dotsOpts(v.dots)}</select></label>
       <button type="button" class="minibtn chartOn" title="Shade from chart: size the selected window's shading from cut-off angles dragged on this chart - the profile angle down from the top for horizontal members, each side in from the facade's edge for a fin on that jamb. The weather dots say which sun to keep out.">Shade from chart</button>`;
     case 'axon': return `<details class="dd axLayers"><summary>Layers</summary><div class="ddmenu">${AX_GROUPS.map(([gk, gl]) =>
       `<div class="laygrp${v.groups[gk] === false ? ' off' : ''}" data-grp="${gk}"><div class="layhd"><label class="chk"><input type="checkbox" data-axg="${gk}" ${v.groups[gk] !== false ? 'checked' : ''}><span><b>${gl}</b></span></label>

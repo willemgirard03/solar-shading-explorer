@@ -6074,6 +6074,7 @@ label.tipped{display:inline}
     return out;
   }
   var cache2 = { key: "", svg: "", ds: null, lit: [] };
+  var ghostEnv = { key: "", cols: [] };
   function backdrop(F, G2) {
     const { S: S2, V: V2, m, B, sel } = F, TG = F.T, doy = S2.doy, fast = V2.sunFast;
     const mask = fast ? null : getMask(TG), env = fast ? null : getEnvelopes(TG);
@@ -6277,6 +6278,21 @@ label.tipped{display:inline}
         if (sp.alt < 0 || b < AZ0 || b > AZ1) continue;
         g += CIRCLE(px(b), py(sp.alt), 1.9, { fill: h <= S2.hour ? "var(--sun)" : "var(--poche)", stroke: "var(--panel)", "stroke-width": 0.8 });
       }
+    }
+    if (F.ghost && !F.T.multi) {
+      const gk = F.ghost.label + "|" + m.key + "|" + m.gf;
+      if (ghostEnv.key !== gk) ghostEnv = { key: gk, cols: envelope(m, m.elements.filter((b) => b.sys === void 0).concat(F.ghost.boxes), ALT_MAX) };
+      let d = "", on = false;
+      for (const c of ghostEnv.cols) {
+        const b = bearing(c.az), ok = c.lo !== null && c.hi < ALT_MAX - 0.5 && b >= AZ0 && b <= AZ1;
+        if (ok) {
+          d += (on ? "L" : "M") + fmt(px(b), 1) + "," + fmt(py(c.hi), 1);
+          on = true;
+        } else on = false;
+      }
+      if (d) g += PATH(d, { stroke: "var(--panel)", w: 3.6, op: 0.8 }) + PATH(d, { stroke: "#7A5CB8", w: 1.8 });
+      const top = ghostEnv.cols.filter((c) => c.lo !== null).reduce((a, c) => !a || Math.abs(c.gam) < Math.abs(a.gam) ? c : a, null);
+      if (top && bearing(top.az) >= AZ0 && bearing(top.az) <= AZ1) g += TB(px(bearing(top.az)) + 8, py(top.hi) - 6, F.ghost.label, { size: 8.5, fill: "#7A5CB8", bg: 0.9 });
     }
     const LV = S2.live;
     if (LV && LV.src === "chart" && LV.cut && LV.f === F.sel.f && LV.st === F.sel.st && !F.T.multi) g += drawCuts(G2, LV.cut, m, cur);
@@ -8383,6 +8399,7 @@ label.tipped{display:inline}
       `<select class="pmenu" data-k="site.${o.f}.kind" aria-label="Boundary">${Object.entries(SITE_KINDS).map(([k, l]) => `<option value="${k}"${k === o.kind ? " selected" : ""}>${l}</option>`).join("")}</select>`
     ) + `<div class="dvrow">${popBtn("siteRotate", "", "Rotate 90\xB0 \u21BB", "Every side\u2019s condition handed on to the next side round, clockwise: north\u2019s to east, east\u2019s to south, south\u2019s to west, west\u2019s to north")}</div><div class="dvnote">Push and pull its lines in the view by their grips; click a figure to type it.</div>`;
   }
+  var dotsOpts = (cur) => `<option value="" hidden selected>Weather dots</option>` + Object.entries(DOT_SPANS).map(([k, l]) => `<option value="${k}">${k === cur ? "\u2713 " : "\u2003"}${l}</option>`).join("");
   var opts = (o, sel) => Object.entries(o).map(([k, l]) => `<option value="${k}"${k === sel ? " selected" : ""}>${l}</option>`).join("");
   var opv = (k, v) => `<span class="opv" data-opk="${k}" tabindex="0" title="Opacity: drag left or right, or click to type">${Math.round(((v.opac || {})[k] ?? 1) * 100)}%</span>`;
   var val = (k, lab, tip) => `<span class="barval"><span class="scrub" data-scrub="${k}" title="Drag left or right to change">${lab}</span> <span class="val" data-val="${k}" tabindex="0" title="${tip}"></span></span>`;
@@ -8400,7 +8417,7 @@ label.tipped{display:inline}
     switch (type) {
       case "sun":
         return `<div class="seg mini sunModes"><button type="button" data-sm="path" aria-pressed="true" title="Sun positions by bearing and altitude">Sun path</button><button type="button" data-sm="year" aria-pressed="false" title="The same shading by day of the year and time of day; click or drag to set the date and time">Year</button></div>
-      <label class="barsel wxdots" title="Each daylit hour of the weather file, coloured by its temperature - cool below 20 \xB0C, comfortable to 27 \xB0C, warm above - at the sun\u2019s place in the middle of that hour. The file\u2019s hours are standard time (PST), so the dots sit between the hour lines, and drift round the solar hours over the year.">Weather dots <select class="dotsSel">${opts(DOT_SPANS, v.dots)}</select></label>
+      <label class="barsel wxdots" title="Each daylit hour of the weather file, coloured by its temperature - cool below 20 \xB0C, comfortable to 27 \xB0C, warm above - at the sun\u2019s place in the middle of that hour. The file\u2019s hours are standard time (PST), so the dots sit between the hour lines, and drift round the solar hours over the year."><select class="dotsSel" aria-label="Weather dots">${dotsOpts(v.dots)}</select></label>
       <button type="button" class="minibtn chartOn" title="Shade from chart: size the selected window's shading from cut-off angles dragged on this chart - the profile angle down from the top for horizontal members, each side in from the facade's edge for a fin on that jamb. The weather dots say which sun to keep out.">Shade from chart</button>`;
       case "axon":
         return `<details class="dd axLayers"><summary>Layers</summary><div class="ddmenu">${AX_GROUPS.map(([gk, gl]) => `<div class="laygrp${v.groups[gk] === false ? " off" : ""}" data-grp="${gk}"><div class="layhd"><label class="chk"><input type="checkbox" data-axg="${gk}" ${v.groups[gk] !== false ? "checked" : ""}><span><b>${gl}</b></span></label>
@@ -10210,6 +10227,12 @@ entering            q \xD7 sunlit glass area \xD7 SHGC   W</div>
     if (!sel.row.cell) return null;
     const m = unitModel(B, sel.f, sel.st, sel.unit), cur = solarAt(S2.doy, S2.hour, S2.timeMode, sel.fac.gf), D0 = selDevice(S2);
     if (!m.opening || !cur.onFacade || !D0) return null;
+    const o = m.opening, e = 1e-4, pts = [];
+    for (let i = 0; i <= 24; i++) {
+      const u = o.u0 + e + (o.u1 - o.u0 - 2 * e) * i / 24, v = o.v0 + e + (o.v1 - o.v0 - 2 * e) * i / 24;
+      pts.push([u, o.v0 + e, 0], [u, o.v1 - e, 0], [o.u0 + e, v, 0], [o.u1 - e, v, 0]);
+    }
+    for (let i = 1; i < 8; i++) for (let j = 1; j < 6; j++) pts.push([o.u0 + (o.u1 - o.u0) * i / 8, o.v0 + (o.v1 - o.v0) * j / 6, 0]);
     const shaded = (over) => {
       const boxes = [];
       for (const { D } of m.live || []) {
@@ -10221,7 +10244,8 @@ entering            q \xD7 sunlit glass area \xD7 SHGC   W</div>
           boxes.push(Object.assign({}, b, { h }));
         }
       }
-      return shadeFraction(m, cur.sl, 41, 33, boxes).frac >= 0.999;
+      const bs = cull(m, cur.sl, boxes);
+      return pts.every((p) => !sunlit(m, p, cur.sl, bs));
     };
     return { D0, shaded };
   }
@@ -11581,7 +11605,11 @@ entering            q \xD7 sunlit glass area \xD7 SHGC   W</div>
     const q = (c) => inst.el.querySelector(c);
     if (type === "sun") {
       q(".dotsSel").addEventListener("change", (e) => {
-        inst.V.dots = e.target.value;
+        const k = e.target.value;
+        if (!k) return;
+        inst.V.dots = k;
+        e.target.innerHTML = dotsOpts(k);
+        e.target.value = "";
         clearSunCache();
         paint(inst, true);
       });
@@ -12278,10 +12306,16 @@ entering            q \xD7 sunlit glass area \xD7 SHGC   W</div>
     }
     const m = buildCell(g, s.h, facadeLength(S, L2.f, L2.st), 0, s.slab ?? SLAB0), sp = solarPosition(S.doy, S.hour, S.timeMode), gf = facadeAzimuth(S, L2.f);
     const onFacade = sp.alt > 0 && Math.cos(wrap180(gf - sp.az) * Math.PI / 180) > 0;
+    const cutToWindow = (sp2) => {
+      if (L2.ext === false) {
+        for (const k2 in sp2) if (sp2[k2]) sp2[k2] = Object.assign({}, sp2[k2], { ext: 0 });
+      }
+      return sp2;
+    };
     if (L2.src === "chart") {
       L2.n = recUI.nh;
       L2.nosol = false;
-      liveApply(chartSpec(m, L2.cut));
+      liveApply(cutToWindow(chartSpec(m, L2.cut)));
       return;
     }
     const Fp = { m, cur: { gf, az: sp.az, vsa: getValue("theta", st2), onFacade }, date: monthDayOf(S.doy), S };
@@ -12293,7 +12327,7 @@ entering            q \xD7 sunlit glass area \xD7 SHGC   W</div>
     }
     const k = liveKind(L2);
     L2.nosol = k === "hv" ? !(specs.h || specs.v) : !specs[k];
-    liveApply(specs);
+    liveApply(cutToWindow(specs));
   }
   var LIVE_VIEWS = { axon: 1, detail: 1, section: 1, plan: 1 };
   var LIVE_SRC = `<select class="livesrc" aria-label="Where the members come from" title="Live shading: the ideal members for the date and time set, remade as they change. Shade from chart: members sized from cut-off angles you drag on the sun path chart - the profile angle down from the top for horizontal members, each side in from the facade's edge for a fin on that jamb.">`;
@@ -12314,14 +12348,15 @@ entering            q \xD7 sunlit glass area \xD7 SHGC   W</div>
       inst.el.querySelector(".v3dbar").appendChild(el);
     }
     const L2 = S.live, chart = L2.src === "chart", cutN = chart && L2.cut ? ["th", "l", "r"].filter((k) => L2.cut[k] != null).join("") : "";
-    const sig = [liveKind(L2), L2.f, L2.st, !!L2.auto, !!L2.nosol, L2.src, cutN, L2.ghost ? L2.ghost.label : ""].join("|");
+    const sig = [liveKind(L2), L2.f, L2.st, !!L2.auto, !!L2.nosol, L2.src, cutN, L2.ghost ? L2.ghost.label : "", L2.ext !== false].join("|");
+    const ext = `<label class="barchk" title="On: each member runs on past the window's edges as far as the sun slips along it, so the rule's cut-off holds across the whole glass. Off: the members stop at the window's edges, as a built design often would - and the sun comes round their ends."><input type="checkbox" class="liveext"${L2.ext !== false ? " checked" : ""}> Shading extends past window</label>`;
     const sl = (k, label) => `<label class="recn" title="How many members share the work: one deep member, or n each 1/n as deep at 1/n the spacing - the same count whichever kind is chosen"><span>${label}</span><input type="range" min="1" max="${MEMBERS_MAX}" step="1" value="${recUI.nh}" data-livn="${k}" aria-label="${label}"><output>${recUI.nh}</output></label>`;
     if (el.dataset.sig !== sig) {
       el.dataset.sig = sig;
       const kind = liveKind(L2);
       const src = LIVE_SRC + [["now", "Live shading"], ["chart", "Shade from chart"]].map(([k, l]) => `<option value="${k}"${(L2.src || "now") === k ? " selected" : ""}>${l}</option>`).join("") + "</select>";
-      if (chart) el.innerHTML = `<span class="liveset">${src}` + (L2.cut && L2.cut.th != null ? sl("n", "Members") : `<span class="livenote" title="On the sun path chart: drag the profile angle down from the top for horizontal members, or a side in from the facade's edge for a fin on that jamb">Drag the cut-offs on the sun path chart</span>`) + `</span><button type="button" class="minibtn liveoff" title="Turn off: keep the shading, or put back what the window had">Turn off</button>`;
-      else el.innerHTML = `<span class="liveset">${src}<label class="barchk" title="Auto: live shading picks horizontal, vertical or a louvred canopy for itself - the one whose members are smallest for the member count set, and one that works where another has no solution"><input type="checkbox" class="liveauto"${L2.auto ? " checked" : ""}> Auto</label><select class="livekind"${L2.auto ? " disabled" : ""} aria-label="What live shading puts on the window" title="What live shading puts on the window: horizontal members, vertical members, both, or a louvred canopy of upright members standing out from the facade">${LIVE_KINDS.map(([k, l]) => `<option value="${k}"${k === kind ? " selected" : ""}>${l}</option>`).join("")}</select>` + (L2.nosol ? `<span class="livenosol" title="No member of this kind, at any count, shades the whole window at this date and time without projecting more than 10 m">No solution</span>` : sl("n", "Members")) + `<button type="button" class="minibtn livecmp${L2.ghost ? " on" : ""}" aria-pressed="${!!L2.ghost}" title="${L2.ghost ? "Comparing with " + L2.ghost.label + ": press to let the ghost go" : "Compare: freeze this moment's members and profile angle as a ghost in the plan and the section, then set another date or time - peak winter against peak summer"}">${L2.ghost ? "Compare: " + L2.ghost.label : "Compare"}</button></span><button type="button" class="minibtn liveoff" title="Turn off live shading: keep the shading under a name, or put back what the window had">Turn off</button>`;
+      if (chart) el.innerHTML = `<span class="liveset">${src}` + ext + (L2.cut && L2.cut.th != null ? sl("n", "Members") : `<span class="livenote" title="On the sun path chart: drag the profile angle down from the top for horizontal members, or a side in from the facade's edge for a fin on that jamb">Drag the cut-offs on the sun path chart</span>`) + `</span><button type="button" class="minibtn liveoff" title="Turn off: keep the shading, or put back what the window had">Turn off</button>`;
+      else el.innerHTML = `<span class="liveset">${src}<label class="barchk" title="Auto: live shading picks horizontal, vertical or a louvred canopy for itself - the one whose members are smallest for the member count set, and one that works where another has no solution"><input type="checkbox" class="liveauto"${L2.auto ? " checked" : ""}> Auto</label><select class="livekind"${L2.auto ? " disabled" : ""} aria-label="What live shading puts on the window" title="What live shading puts on the window: horizontal members, vertical members, both, or a louvred canopy of upright members standing out from the facade">${LIVE_KINDS.map(([k, l]) => `<option value="${k}"${k === kind ? " selected" : ""}>${l}</option>`).join("")}</select>` + (L2.nosol ? `<span class="livenosol" title="No member of this kind, at any count, shades the whole window at this date and time without projecting more than 10 m">No solution</span>` : sl("n", "Members")) + ext + `<button type="button" class="minibtn livecmp${L2.ghost ? " on" : ""}" aria-pressed="${!!L2.ghost}" title="${L2.ghost ? "Comparing with " + L2.ghost.label + ": press to let the ghost go" : "Compare: freeze this moment's members and profile angle as a ghost in the plan and the section, then set another date or time - peak winter against peak summer"}">${L2.ghost ? "Compare: " + L2.ghost.label : "Compare"}</button></span><button type="button" class="minibtn liveoff" title="Turn off live shading: keep the shading under a name, or put back what the window had">Turn off</button>`;
     } else el.querySelectorAll("[data-livn]").forEach((i) => {
       if (document.activeElement !== i) {
         i.value = recUI.nh;
@@ -12340,6 +12375,7 @@ entering            q \xD7 sunlit glass area \xD7 SHGC   W</div>
     if (e.target.dataset && (e.target.dataset.livn || e.target.dataset.recn)) schedule();
     if (e.target.matches && e.target.matches(".livekind")) api.act("liveKind", e.target.value);
     if (e.target.matches && e.target.matches(".livesrc")) api.act("liveSrc", e.target.value);
+    if (e.target.matches && e.target.matches(".liveext")) api.act("liveExt", e.target.checked);
     if (e.target.matches && e.target.matches(".liveauto")) api.act("liveAuto", e.target.checked);
   });
   document.addEventListener("click", (e) => {
@@ -13049,6 +13085,10 @@ entering            q \xD7 sunlit glass area \xD7 SHGC   W</div>
       }
       const F = lastF, md = monthDayOf(S.doy);
       liveCompare({ label: MONTHS[md.m - 1] + " " + md.d + " " + hhmm(S.hour), doy: S.doy, hour: S.hour, th: F && F.cur.onFacade ? F.cur.vsa : null, gam: F ? -F.cur.gamma : null });
+    },
+    liveExt: (on) => {
+      H2.mark("live");
+      if (S.live) S.live.ext = !!on;
     },
     liveSrc: (k) => {
       H2.mark("live");

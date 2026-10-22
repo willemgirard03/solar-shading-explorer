@@ -6,7 +6,7 @@ import { wireOpacity } from './scrubnum.js';
 import { ALT_MAX } from '../studies.js';
 import { clamp, wrap360, wrap180 } from '../util.js';
 import { solarPosition, sunVec, solarAt } from '../solar.js';
-import { shadeFraction } from '../geometry/analysis.js';
+import { sunlit, cull } from '../geometry/analysis.js';
 import { sunSamples, pickSunAt } from '../sunpick.js';
 import { FACADES, MULTI, facadeAzimuth, buildBuilding, resolveSel, unitModel, blankCell, faceOffset, plateMax, contextPlace, storeyCentre, storeyRot } from '../geometry/building.js';
 import { AXCAM0, DETCAM0 } from '../view.js';
@@ -101,6 +101,14 @@ function sunNow(S) {
   if (!sel.row.cell) return null;
   const m = unitModel(B, sel.f, sel.st, sel.unit), cur = solarAt(S.doy, S.hour, S.timeMode, sel.fac.gf), D0 = selDevice(S);
   if (!m.opening || !cur.onFacade || !D0) return null;
+  /* the glass is in shade when its edges are - read on the edge itself, so no
+     sliver of sun is left along the sill or a jamb - and a grid inside them */
+  const o = m.opening, e = 1e-4, pts = [];
+  for (let i = 0; i <= 24; i++) {
+    const u = o.u0 + e + (o.u1 - o.u0 - 2 * e) * i / 24, v = o.v0 + e + (o.v1 - o.v0 - 2 * e) * i / 24;
+    pts.push([u, o.v0 + e, 0], [u, o.v1 - e, 0], [o.u0 + e, v, 0], [o.u1 - e, v, 0]);
+  }
+  for (let i = 1; i < 8; i++) for (let j = 1; j < 6; j++) pts.push([o.u0 + (o.u1 - o.u0) * i / 8, o.v0 + (o.v1 - o.v0) * j / 6, 0]);
   const shaded = over => {
     const boxes = [];
     for (const { D } of m.live || []) {
@@ -110,7 +118,8 @@ function sunNow(S) {
         boxes.push(Object.assign({}, b, { h }));
       }
     }
-    return shadeFraction(m, cur.sl, 41, 33, boxes).frac >= 0.999;
+    const bs = cull(m, cur.sl, boxes);
+    return pts.every(p => !sunlit(m, p, cur.sl, bs));
   };
   return { D0, shaded };
 }

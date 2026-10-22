@@ -21,7 +21,7 @@ function multiWWR(B, TG) {
   });
   return wall > 0 ? glass / wall : 0;
 }
-import { litSpans, limitAtNormal } from '../geometry/analysis.js';
+import { litSpans, limitAtNormal, envelope } from '../geometry/analysis.js';
 import { ALT_MAX, getMask, getEnvelopes, getDaySamples, getDaySpan } from '../studies.js';
 import { hourly } from '../weather.js';
 import { W, H, El, T, L, POLY, PATH, RECT, CIRCLE, TB, defsCommon, svg } from './svg.js';
@@ -238,6 +238,7 @@ function envRuns(G, cols) {
 }
 
 let cache = { key: '', svg: '', ds: null, lit: [] };
+let ghostEnv = { key: '', cols: [] };
 function backdrop(F, G) {
   const { S, V, m, B, sel } = F, TG = F.T, doy = S.doy, fast = V.sunFast;
   const mask = fast ? null : getMask(TG), env = fast ? null : getEnvelopes(TG);
@@ -454,6 +455,20 @@ export function drawSunPath(F) {
       if (sp.alt < 0 || b < AZ0 || b > AZ1) continue;
       g += CIRCLE(px(b), py(sp.alt), 1.9, { fill: h <= S.hour ? 'var(--sun)' : 'var(--poche)', stroke: 'var(--panel)', 'stroke-width': .8 });
     }
+  }
+  // Compare: the cut-off the frozen moment's members gave, as built, in the ghost's purple
+  if (F.ghost && !F.T.multi) {
+    const gk = F.ghost.label + '|' + m.key + '|' + m.gf;
+    if (ghostEnv.key !== gk) ghostEnv = { key: gk, cols: envelope(m, m.elements.filter(b => b.sys === undefined).concat(F.ghost.boxes), ALT_MAX) };
+    // its upper edge only - the altitude above which it shades the window - where that lies inside the chart
+    let d = '', on = false;
+    for (const c of ghostEnv.cols) {
+      const b = bearing(c.az), ok = c.lo !== null && c.hi < ALT_MAX - 0.5 && b >= AZ0 && b <= AZ1;
+      if (ok) { d += (on ? 'L' : 'M') + fmt(px(b), 1) + ',' + fmt(py(c.hi), 1); on = true; } else on = false;
+    }
+    if (d) g += PATH(d, { stroke: 'var(--panel)', w: 3.6, op: .8 }) + PATH(d, { stroke: '#7A5CB8', w: 1.8 });
+    const top = ghostEnv.cols.filter(c => c.lo !== null).reduce((a, c) => !a || Math.abs(c.gam) < Math.abs(a.gam) ? c : a, null);
+    if (top && bearing(top.az) >= AZ0 && bearing(top.az) <= AZ1) g += TB(px(bearing(top.az)) + 8, py(top.hi) - 6, F.ghost.label, { size: 8.5, fill: '#7A5CB8', bg: .9 });
   }
   // From the chart: the cut-offs, ready to drag
   const LV = S.live;

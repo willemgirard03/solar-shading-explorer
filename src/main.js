@@ -35,7 +35,7 @@ import { chartGainDay, chartGainYear, chartShadeYear } from './draw/charts.js';
 import { WEATHER_FILES, parseEpw, addWeather } from './weather.js';
 import { titleBlock, setSheet, SHEET0 } from './draw/svg.js';
 import { sheetFor, buildLayout, wireLayout, margins, removeView, saveLayout } from './ui/layout.js';
-import { createView, VIEW_TYPES, devicePopHTML, windowPopHTML, emptyPopHTML, storeyPopHTML, sitePopHTML, ctxPopHTML } from './ui/views.js';
+import { dotsOpts, createView, VIEW_TYPES, devicePopHTML, windowPopHTML, emptyPopHTML, storeyPopHTML, sitePopHTML, ctxPopHTML } from './ui/views.js';
 import { makeWidget, openWidget, closeWidget, hideWidget, showWidget } from './ui/widgets.js';
 import { buildCell as liveCell, SLAB0 as LIVE_SLAB0 } from './geometry/cell.js';
 import { axonIso, axonIsoDevs } from './draw/axon.js';
@@ -78,7 +78,11 @@ function makeInst(type, pin = null) {
   // the bar's own controls, for this view alone
   const q = c => inst.el.querySelector(c);
   if (type === 'sun') {
-    q('.dotsSel').addEventListener('change', e => { inst.V.dots = e.target.value; clearSunCache(); paint(inst, true); });
+    q('.dotsSel').addEventListener('change', e => {
+      const k = e.target.value; if (!k) return;
+      inst.V.dots = k; e.target.innerHTML = dotsOpts(k); e.target.value = '';
+      clearSunCache(); paint(inst, true);
+    });
     // the sun path, or the year by day and hour
     q('.sunModes').addEventListener('click', e => {
       const b = e.target.closest('[data-sm]'); if (!b) return;
@@ -537,7 +541,9 @@ function liveUpdate() {
   const m = liveCell(g, s.h, liveLen(S, L.f, L.st), 0, s.slab ?? LIVE_SLAB0), sp = liveSun(S.doy, S.hour, S.timeMode), gf = liveAz(S, L.f);
   const onFacade = sp.alt > 0 && Math.cos(liveWrap(gf - sp.az) * Math.PI / 180) > 0;
   // from the chart: what the cut-offs set ask for, whatever the hour
-  if (L.src === 'chart') { L.n = recUI.nh; L.nosol = false; liveApply(chartSpec(m, L.cut)); return; }
+  // off, every member stops at the window's edges: what the rule asks for, cut to what the window looks like
+  const cutToWindow = sp => { if (L.ext === false) for (const k in sp) if (sp[k]) sp[k] = Object.assign({}, sp[k], { ext: 0 }); return sp; };
+  if (L.src === 'chart') { L.n = recUI.nh; L.nosol = false; liveApply(cutToWindow(chartSpec(m, L.cut))); return; }
   const Fp = { m, cur: { gf, az: sp.az, vsa: getValue('theta', st2), onFacade }, date: liveDate(S.doy), S };
   const specs = { h: idealSpec(Fp, 'h'), v: idealSpec(Fp, 'v'), c: idealSpec(Fp, 'c') };
   /* Auto: of the kinds with a solution now, the smallest for the member count
@@ -551,7 +557,7 @@ function liveUpdate() {
   }
   const k = liveKind(L);
   L.nosol = k === 'hv' ? !(specs.h || specs.v) : !specs[k];
-  liveApply(specs);
+  liveApply(cutToWindow(specs));
 }
 /* While it is on, every view says so along its top: the member counts to the
    left, and the way to turn it off to the right. */
@@ -569,20 +575,21 @@ function liveBar(inst) {
   if (!S.live || !(LIVE_VIEWS[inst.type] || (inst.type === 'sun' && S.live.src === 'chart'))) { if (el) el.remove(); return; }
   if (!el) { el = document.createElement('div'); el.className = 'livebar'; inst.el.querySelector('.v3dbar').appendChild(el); }
   const L = S.live, chart = L.src === 'chart', cutN = chart && L.cut ? ['th', 'l', 'r'].filter(k => L.cut[k] != null).join('') : '';
-  const sig = [liveKind(L), L.f, L.st, !!L.auto, !!L.nosol, L.src, cutN, L.ghost ? L.ghost.label : ''].join('|');
+  const sig = [liveKind(L), L.f, L.st, !!L.auto, !!L.nosol, L.src, cutN, L.ghost ? L.ghost.label : '', L.ext !== false].join('|');
+  const ext = `<label class="barchk" title="On: each member runs on past the window's edges as far as the sun slips along it, so the rule's cut-off holds across the whole glass. Off: the members stop at the window's edges, as a built design often would - and the sun comes round their ends."><input type="checkbox" class="liveext"${L.ext !== false ? ' checked' : ''}> Shading extends past window</label>`;
   const sl = (k, label) => `<label class="recn" title="How many members share the work: one deep member, or n each 1/n as deep at 1/n the spacing - the same count whichever kind is chosen"><span>${label}</span><input type="range" min="1" max="${MEMBERS_MAX}" step="1" value="${recUI.nh}" data-livn="${k}" aria-label="${label}"><output>${recUI.nh}</output></label>`;
   if (el.dataset.sig !== sig) {
     el.dataset.sig = sig;
     const kind = liveKind(L);
     const src = LIVE_SRC + [['now', 'Live shading'], ['chart', 'Shade from chart']].map(([k, l]) => `<option value="${k}"${(L.src || 'now') === k ? ' selected' : ''}>${l}</option>`).join('') + '</select>';
     if (chart) el.innerHTML = `<span class="liveset">${src}`
-      + (L.cut && L.cut.th != null ? sl('n', 'Members') : `<span class="livenote" title="On the sun path chart: drag the profile angle down from the top for horizontal members, or a side in from the facade's edge for a fin on that jamb">Drag the cut-offs on the sun path chart</span>`)
+      + ext + (L.cut && L.cut.th != null ? sl('n', 'Members') : `<span class="livenote" title="On the sun path chart: drag the profile angle down from the top for horizontal members, or a side in from the facade's edge for a fin on that jamb">Drag the cut-offs on the sun path chart</span>`)
       + `</span><button type="button" class="minibtn liveoff" title="Turn off: keep the shading, or put back what the window had">Turn off</button>`;
     else el.innerHTML = `<span class="liveset">${src}`
       + `<label class="barchk" title="Auto: live shading picks horizontal, vertical or a louvred canopy for itself - the one whose members are smallest for the member count set, and one that works where another has no solution"><input type="checkbox" class="liveauto"${L.auto ? ' checked' : ''}> Auto</label>`
       + `<select class="livekind"${L.auto ? ' disabled' : ''} aria-label="What live shading puts on the window" title="What live shading puts on the window: horizontal members, vertical members, both, or a louvred canopy of upright members standing out from the facade">${LIVE_KINDS.map(([k, l]) => `<option value="${k}"${k === kind ? ' selected' : ''}>${l}</option>`).join('')}</select>`
       + (L.nosol ? `<span class="livenosol" title="No member of this kind, at any count, shades the whole window at this date and time without projecting more than 10 m">No solution</span>` : sl('n', 'Members'))
-      + `<button type="button" class="minibtn livecmp${L.ghost ? ' on' : ''}" aria-pressed="${!!L.ghost}" title="${L.ghost ? 'Comparing with ' + L.ghost.label + ': press to let the ghost go' : 'Compare: freeze this moment\'s members and profile angle as a ghost in the plan and the section, then set another date or time - peak winter against peak summer'}">${L.ghost ? 'Compare: ' + L.ghost.label : 'Compare'}</button>`
+      + ext + `<button type="button" class="minibtn livecmp${L.ghost ? ' on' : ''}" aria-pressed="${!!L.ghost}" title="${L.ghost ? 'Comparing with ' + L.ghost.label + ': press to let the ghost go' : 'Compare: freeze this moment\'s members and profile angle as a ghost in the plan and the section, then set another date or time - peak winter against peak summer'}">${L.ghost ? 'Compare: ' + L.ghost.label : 'Compare'}</button>`
       + `</span><button type="button" class="minibtn liveoff" title="Turn off live shading: keep the shading under a name, or put back what the window had">Turn off</button>`;
   } else el.querySelectorAll('[data-livn]').forEach(i => { if (document.activeElement !== i) { i.value = recUI.nh; i.nextElementSibling.textContent = recUI.nh; } });
 }
@@ -596,6 +603,7 @@ document.addEventListener('change', e => {
   if (e.target.dataset && (e.target.dataset.livn || e.target.dataset.recn)) schedule();
   if (e.target.matches && e.target.matches('.livekind')) api.act('liveKind', e.target.value);
   if (e.target.matches && e.target.matches('.livesrc')) api.act('liveSrc', e.target.value);
+  if (e.target.matches && e.target.matches('.liveext')) api.act('liveExt', e.target.checked);
   if (e.target.matches && e.target.matches('.liveauto')) api.act('liveAuto', e.target.checked);
 });
 // Compare, on the bar while the optimization is on
@@ -1027,6 +1035,7 @@ const ACTS = {
     const F = lastF, md = liveDate(S.doy);
     liveCompare({ label: MONTHS[md.m - 1] + ' ' + md.d + ' ' + hhmm(S.hour), doy: S.doy, hour: S.hour, th: F && F.cur.onFacade ? F.cur.vsa : null, gam: F ? -F.cur.gamma : null });
   },
+  liveExt: on => { H.mark('live'); if (S.live) S.live.ext = !!on; },
   liveSrc: k => {
     H.mark('live'); liveStart(k === 'chart' ? 'chart' : 'now'); if (S.pick === 'device') S.pick = null;
     // the member count the window's chart cut-offs were kept with
