@@ -70,38 +70,60 @@ function anchorAt(w) {
   const pt = svgEl.createSVGPoint(); pt.x = a.x; pt.y = a.y;
   return pt.matrixTransform(ctm);
 }
-/** where it stands: beside its anchor or where it was moved to - then kept on the screen while its view is */
+/** what it controls, on the screen: { l, t, r, b } */
+function boxAt(w) {
+  const b = w.anchor && w.anchor.box, svgEl = b && w.at.host.querySelector(':scope > svg'), ctm = svgEl && svgEl.getScreenCTM && svgEl.getScreenCTM();
+  if (!ctm) return null;
+  const q = [[b[0], b[1]], [b[2], b[1]], [b[0], b[3]], [b[2], b[3]]].map(([x, y]) => { const p = svgEl.createSVGPoint(); p.x = x; p.y = y; return p.matrixTransform(ctm); });
+  return { l: Math.min(...q.map(p => p.x)), r: Math.max(...q.map(p => p.x)), t: Math.min(...q.map(p => p.y)), b: Math.max(...q.map(p => p.y)) };
+}
+/* Where it stands: where it was moved to, or beside what it controls - to its
+   side, or under or over it, clear of it and of the other pop-overs open, out
+   past its own view if that is what it takes - then kept on the screen while
+   its view is. Over a view full screen that is not its own, it is not shown. */
 export function placeWidget(w) {
   if (w.el.hidden || !w.at || !w.at.el.isConnected) return;
-  const el = w.el, vr = w.at.el.getBoundingClientRect(), wd = el.offsetWidth, h = el.offsetHeight;
+  const el = w.el, full = document.querySelector('.view.full');
+  el.style.visibility = full && full !== w.at.el ? 'hidden' : '';
+  if (el.style.visibility) return;
+  const vr = w.at.el.getBoundingClientRect(), wd = el.offsetWidth, h = el.offsetHeight;
+  // under the view's bar and over the dock
+  const bar = w.at.el.querySelector('.v3dbar'), dock = document.getElementById('dock');
+  const T = (bar ? bar.getBoundingClientRect().bottom : vr.top) + 4;
+  const B = Math.min(innerHeight, dock && dock.offsetHeight ? dock.getBoundingClientRect().top : innerHeight) - 4;
+  const others = (w.hooks.avoid ? w.hooks.avoid() : []).filter(o => o && o !== w && !o.el.hidden && !o.el.style.visibility).map(o => o.el.getBoundingClientRect());
+  const hit = (cx, cy) => others.some(r => cx < r.right + 4 && cx + wd > r.left - 4 && cy < r.bottom + 4 && cy + h > r.top - 4);
   let x, y;
   if (w.off) { x = vr.left + w.off[0]; y = vr.top + w.off[1]; }
   else {
-    const c = anchorAt(w);
-    if (!c) return;
+    const bx = boxAt(w), c = anchorAt(w);
+    if (!c && !bx) return;
     const left = w.anchor.side === 'left';
-    x = left ? c.x - 18 - wd : c.x + 18; y = w.anchor.mid ? c.y - h / 2 : c.y + 18;
-    // turned to the other side where it would leave its view, then held inside it where it fits
-    const L = Math.max(4, vr.left + 4), R = Math.min(innerWidth - 4, vr.right - 4);
-    if (!left && x + wd > R) x = c.x - 18 - wd;
-    if (left && x < L) x = c.x + 18;
-    if (R - L >= wd) x = clampN(x, L, R - wd);
-    // clear of the other small windows open beside it: to their side, or under or over them
-    const others = (w.hooks.avoid ? w.hooks.avoid() : []).filter(o => o && o !== w && !o.el.hidden).map(o => o.el.getBoundingClientRect());
-    const hit = (cx, cy) => others.some(r => cx < r.right + 4 && cx + wd > r.left - 4 && cy < r.bottom + 4 && cy + h > r.top - 4);
-    if (hit(x, y)) {
-      const tries = [];
-      for (const r of others) tries.push([r.right + 8, y], [r.left - 8 - wd, y], [x, r.bottom + 8], [x, r.top - 8 - h]);
-      const ok = tries.find(([cx, cy]) => cx >= 4 && cx + wd <= innerWidth - 4 && cy >= vr.top && cy + h <= vr.bottom && !hit(cx, cy));
-      if (ok) [x, y] = ok;
+    if (bx) {
+      const G = 16, cy = (bx.t + bx.b) / 2, cx = (bx.l + bx.r) / 2, yIn = v => clampN(v, T, Math.max(T, B - h)), xIn = v => clampN(v, 4, innerWidth - wd - 4);
+      const side = [[bx.r + G, yIn(cy - h / 2)], [bx.l - G - wd, yIn(cy - h / 2)]];
+      const opts = (left ? side.reverse() : side).concat([[xIn(cx - wd / 2), bx.b + G], [xIn(cx - wd / 2), bx.t - G - h]]);
+      const onScreen = ([cx2, cy2]) => cx2 >= 4 && cx2 + wd <= innerWidth - 4 && cy2 >= T - 0.5 && cy2 + h <= B + 0.5;
+      const over = ([cx2, cy2]) => Math.max(0, Math.min(cx2 + wd, bx.r) - Math.max(cx2, bx.l)) * Math.max(0, Math.min(cy2 + h, bx.b) - Math.max(cy2, bx.t));
+      const pick = opts.find(o => onScreen(o) && !over(o) && !hit(o[0], o[1])) || opts.find(o => onScreen(o) && !over(o))
+        // nowhere clear: where it covers the least of it
+        || opts.map(([cx2, cy2]) => [xIn(cx2), yIn(cy2)]).reduce((a, o) => over(o) < over(a) ? o : a);
+      [x, y] = pick;
+    } else {
+      x = left ? c.x - 18 - wd : c.x + 18; y = w.anchor.mid ? c.y - h / 2 : c.y + 18;
+      if (!left && x + wd > innerWidth - 4) x = c.x - 18 - wd;
+      if (left && x < 4) x = c.x + 18;
+      if (hit(x, y)) {
+        const tries = [];
+        for (const r of others) tries.push([r.right + 8, y], [r.left - 8 - wd, y], [x, r.bottom + 8], [x, r.top - 8 - h]);
+        const ok = tries.find(([cx2, cy2]) => cx2 >= 4 && cx2 + wd <= innerWidth - 4 && cy2 >= vr.top && cy2 + h <= vr.bottom && !hit(cx2, cy2));
+        if (ok) [x, y] = ok;
+      }
     }
     // one that stays put keeps the place it opened in, against its view
     if (w.stay) w.off = [x - vr.left, y - vr.top];
   }
-  // under the view's bar and over the dock, while the view is on the screen; past it, it goes with the view
-  const bar = w.at.el.querySelector('.v3dbar'), dock = document.getElementById('dock');
-  const T = (bar ? bar.getBoundingClientRect().bottom : vr.top) + 4;
-  const B = Math.min(innerHeight, dock && dock.offsetHeight ? dock.getBoundingClientRect().top : innerHeight) - 4;
+  // while the view is on the screen; past it, it goes with the view
   const lo = Math.min(T, vr.bottom - h), hi = Math.max(B - h, vr.top);
   y = Math.max(lo, Math.min(hi, y));
   x = clampN(x, 4, innerWidth - wd - 4);

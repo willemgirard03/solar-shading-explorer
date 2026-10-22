@@ -427,7 +427,8 @@ export function drawDetail(F) {
   g += tag([S.cutU, x.v1, x.w0], 'var(--glass)', 'section ' + fmt(S.cutU * 1000, 0) + ' mm', 'cutU');
   g += tag([uAway, S.cutV, x.w0], 'var(--sun)', 'plan ' + fmt(S.cutV * 1000, 0) + ' mm', 'cutV');
 
-  { const o = m.opening, q = P([(o.u0 + o.u1) / 2, (o.v0 + o.v1) / 2, 0]); detailWinPop = { x: q[0], y: q[1], kind: 'window' }; }
+  { const o = m.opening, q = P([(o.u0 + o.u1) / 2, (o.v0 + o.v1) / 2, 0]), cs = [[o.u0, o.v0], [o.u1, o.v0], [o.u0, o.v1], [o.u1, o.v1]].map(([u, v]) => P([u, v, 0]));
+    detailWinPop = { x: q[0], y: q[1], kind: 'window', box: [Math.min(...cs.map(p => p[0])), Math.min(...cs.map(p => p[1])), Math.max(...cs.map(p => p[0])), Math.max(...cs.map(p => p[1]))] }; }
   // one sun ray, from outside through the glass to where it lands inside
   if (cur.onFacade) {
     const o = m.opening, oc = (o.u0 + o.u1) / 2, hw = m.winW / 2, land = [clamp(S.cutU, oc - hw * 0.8, oc + hw * 0.8), (m.sill + m.head) / 2, 0];

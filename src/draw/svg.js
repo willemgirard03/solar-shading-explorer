@@ -133,6 +133,8 @@ export function gumball(grips, ox, oy, axes) {
   return s + CIRCLE(ox, oy, 5.5, { fill: 'var(--panel)', stroke: 'var(--ink2)', 'stroke-width': 1.4 }) + CIRCLE(ox, oy, 1.8, { fill: 'var(--ink2)' });
 }
 
+/** the box round points on the sheet: [x0, y0, x1, y1] - what a pop-over keeps clear of */
+export const bboxOf = pts => pts.length ? [Math.min(...pts.map(p => p[0])), Math.min(...pts.map(p => p[1])), Math.max(...pts.map(p => p[0])), Math.max(...pts.map(p => p[1]))] : null;
 /** a length as the drawings write it: in millimetres */
 export const mm = v => fmt(v * 1000, 0) + ' mm';
 

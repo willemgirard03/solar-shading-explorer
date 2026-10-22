@@ -19,7 +19,7 @@ import { fmt, D2R } from '../util.js';
 import { projectBox } from '../geometry/boxes.js';
 import { arrayAnchor, memberSpan } from '../geometry/arrays.js';
 import { HINGE_F, memberLen, arrayOn } from '../geometry/device.js';
-import { L, POLY, PATH, TB, CIRCLE, dim, arc, arrayBracket, gumball } from './svg.js';
+import { L, POLY, PATH, TB, CIRCLE, dim, arc, arrayBracket, gumball, bboxOf } from './svg.js';
 import { arrayFigures } from '../state.js';
 
 const wrapPi = a => Math.atan2(Math.sin(a), Math.cos(a));
@@ -85,7 +85,7 @@ export function arrayMembers(m, ax, dA, dW) {
 }
 
 export function deviceEdit(v, D, mine, m, grips) {
-  const { P, ax, drop } = v, ai = ax === 'U' ? 0 : 1;
+  const { P, ax, drop } = v, ai = ax === 'U' ? 0 : 1, g0 = grips.length;
   const at0 = P([0, 0]), dA = [P([1, 0])[0] - at0[0], P([1, 0])[1] - at0[1]], dW = [P([0, 1])[0] - at0[0], P([0, 1])[1] - at0[1]];
   const sc = (d, t) => [d[0] * t, d[1] * t];
   const pts = mine.flatMap(b => projectBox(b, drop));
@@ -178,5 +178,6 @@ export function deviceEdit(v, D, mine, m, grips) {
   const aHz = Math.abs(dA[0]) > Math.abs(dA[1]);
   const offAx = { key: 'd.off' + ax, from: offA, dir: dA }, offW = { key: 'd.offset', from: D.offset, dir: dW };
   if (!v.noGum) s += gumball(grips, O[0], O[1], aHz ? [offAx, offW] : [offW, offAx]);
-  return { svg: s, pop: { x: O[0], y: O[1], ax, arrayView, kind: 'device' } };
+  const box = bboxOf(pts.map(P).concat(grips.slice(g0).map(gp => gp.p), [[O[0] - 44, O[1] - 44], [O[0] + 44, O[1] + 44]]));
+  return { svg: s, pop: { x: O[0], y: O[1], ax, arrayView, kind: 'device', box } };
 }

@@ -13,7 +13,7 @@ import { D2R, fmt, clipSeg, clamp } from '../util.js';
 import { sliceBox, projectBox, boxHi, boxLo, aaBox } from '../geometry/boxes.js';
 import { wallPieces, GLASS_T } from '../geometry/cell.js';
 import { scanLine } from '../geometry/analysis.js';
-import { W, H, T, L, POLY, RECT, TB, CIRCLE, PATH, dim, arc, defsCommon, svg, sunKnob, gripMark, mm } from './svg.js';
+import { W, H, T, L, POLY, RECT, TB, CIRCLE, PATH, dim, arc, defsCommon, svg, sunKnob, gripMark, mm, bboxOf } from './svg.js';
 import { deviceEdit, depthStrings, arrayMembers } from './devedit.js';
 import { siteAcross } from '../geometry/site.js';
 const SITE_LOOK = { line: { stroke: '#A23A16', w: 1.1, dash: '9 3 2 3' }, curb: { stroke: 'var(--ink3)', w: .8, dash: '5 3' }, limit: { stroke: '#C0442B', w: 1, dash: '3 2', op: .85 } };
@@ -190,7 +190,7 @@ export function drawSection(F, study) {
     // the slabs over and under the storey pick the window too - the slab's handle is among its own
     const sbH = clamp(m.slab ?? 0.22, 0, h - 0.1), slabPts = (v0, v1) => [[X(wFar), Y(v0)], [X(wallOut), Y(v0)], [X(wallOut), Y(v1)], [X(wFar), Y(v1)]];
     sectionDevHits.push({ pts: slabPts(h - sbH, h), i: 'win', cut: false }, { pts: slabPts(-Math.max(0.15, sbH), 0), i: 'win', cut: false });
-    if (EDIT) { g += POLY(band, { fill: 'none', stroke: 'var(--glass)', w: 1.2, dash: '4 3' }); sectionPop = { x: X(0), y: Y((sill + head) / 2), kind: 'window' }; }
+    if (EDIT) { g += POLY(band, { fill: 'none', stroke: 'var(--glass)', w: 1.2, dash: '4 3' }); sectionPop = { x: X(0), y: Y((sill + head) / 2), kind: 'window', box: bboxOf(band.concat(...sectionDevHits.filter(d => typeof d.i === 'number').map(d => d.pts))) }; }
   }
   // the principal sun ray and the vertical profile angle, clipped to the sheet
   const outerEdge = b => {

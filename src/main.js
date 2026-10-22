@@ -39,6 +39,7 @@ import { dotsOpts, createView, VIEW_TYPES, devicePopHTML, windowPopHTML, emptyPo
 import { makeWidget, openWidget, closeWidget, hideWidget, showWidget } from './ui/widgets.js';
 import { buildCell as liveCell, SLAB0 as LIVE_SLAB0 } from './geometry/cell.js';
 import { axonIso, axonIsoDevs } from './draw/axon.js';
+import { bboxOf } from './draw/svg.js';
 import { startTour } from './ui/tour.js';
 import { facadeLength as liveLen, facadeAzimuth as liveAz } from './geometry/building.js';
 import { solarPosition as liveSun } from './solar.js';
@@ -285,7 +286,7 @@ function devPop(inst, F) {
   // a bare side has no window for the frame to carry the pick on: the pick itself says so
   // isolated in the building view, the window's own small window stays - a device picked from it is pulled there
   const isoOn = inst.type === 'axon' && !!inst.V.iso;
-  const P = inst.h.pop, has = !!selCell(), isWin = !!(P && (P.kind === 'window' || P.kind === 'wall') && (F.pick === 'window' || isoOn || (!has && S.pick === 'window')));
+  const P = inst.h.pop, has = !!selCell(), isWin = !!(P && (P.kind === 'window' || P.kind === 'wall') && (F.pick === 'window' || (isoOn && !F.selD) || (!has && S.pick === 'window')));
   if (!(P && (isWin || F.selD) && POP.st !== 'closed')) { hideWidget(POP); return; }
   const min = POP.st === 'min';
   let html;
@@ -302,10 +303,10 @@ function devPop(inst, F) {
       grpName: (selShading(S) || {}).name || 'Shading group', grpId: (selShading(S) || {}).id, grpOpts: libOf('shading').map(x => [x.id, x.name || 'Shading group']),
       sysId: r.sys, winOpts: libOf('systems').map(y => [y.id, y.name || 'Window group']),
       arr: getValue('g.arrOn'), by: getValue('g.arrBy'), sides: getValue('matchSides'), up: getValue('matchGlazing'), above: S.sel.st < S.storeys.length - 1 });
-  } else html = devicePopHTML(F.selD, P.ax, P.arrayView, min, { simple: S.mode === 'simple', more: POP.more, grpName: (selShading(S) || {}).name || 'Shading group', grpId: (selShading(S) || {}).id,
+  } else html = devicePopHTML(F.selD, P.ax, P.arrayView, min, { simple: S.mode === 'simple', more: POP.more, axon: isoOn, both: isoOn, grpName: (selShading(S) || {}).name || 'Shading group', grpId: (selShading(S) || {}).id,
     grpOpts: libOf('shading').map(x => [x.id, x.name || 'Shading group']), devOpts: libOf('devices').filter(D => D.dir === F.selD.dir).map(D => [D.id, D.name || deviceLabel(D)]) });
   // in the site view, to the window's left, clear of the storey's own small window on its right
-  showWidget(POP, html, { x: P.x, y: P.y, side: inst.type === 'axon' ? 'left' : 'right', mid: inst.type === 'axon' });
+  showWidget(POP, html, { x: P.x, y: P.y, box: P.box, side: inst.type === 'axon' ? 'left' : 'right', mid: inst.type === 'axon' });
 }
 /** the selected storey's small window, beside it in the site view */
 function storeyPop(inst) {
@@ -315,7 +316,7 @@ function storeyPop(inst) {
   if (!(V.plate.on && pe && pe.anchor) || S.mode === 'simple') { hideWidget(SW); return; }
   const n = S.storeys.length, p = S.storeys[S.sel.st];
   showWidget(SW, storeyPopHTML(SW.st === 'min', { i: S.sel.st, n, full: n >= STOREYS_MAX, match: getValue('matchPlate'), rotBelow: (p.rotRel || 'building') === 'below' }),
-    { x: pe.anchor[0], y: pe.anchor[1], side: 'right', mid: true });
+    { x: pe.anchor[0], y: pe.anchor[1], side: 'right', mid: true, box: bboxOf((inst.h.hits || []).filter(h => h.st === S.sel.st).flatMap(h => h.pts)) });
 }
 /* the site boundary's small window, off the middle of the side being set; the side picked out while it is open */
 const SITEW = makeWidget('sitepop', { change: w => { V.siteEdit = w.st !== 'closed'; if (w.at) paint(w.at); } });
@@ -337,7 +338,7 @@ function ctxPop(inst) {
   if (!ed || ed.id !== id || !ed.anchor) { hideWidget(CTXW); return; }
   const c = (S.site.ctx || []).find(k => k.id === id);
   showWidget(CTXW, ctxPopHTML(CTXW.st === 'min', { n: contextGroup(S, id).length, rot: c && c.inheritRot, follow: getValue('site.ctxFollow'), adv: S.mode !== 'simple' }),
-    { x: ed.anchor[0], y: ed.anchor[1], side: 'right', mid: true });
+    { x: ed.anchor[0], y: ed.anchor[1], side: 'right', mid: true, box: bboxOf(((inst.h.ctxHits || []).find(h => h.id === id) || { pts: [] }).pts.concat(ed.faces.map(f => f.p), [ed.rot.p])) });
 }
 function sitePop(inst) {
   if (SITEW.at !== inst) return;
@@ -1001,6 +1002,8 @@ const ACTS = {
     pickOnly(+a, insts().find(x => x.type === want) || insts().find(x => x.type === 'section' || x.type === 'plan') || null);
   },
   // the window isolated in the building view, or the building back
+  // back from a device to the window, in the building view
+  isoWinPick: () => { S.pick = 'window'; picked = 'window'; },
   isoWin: () => {
     const inst = POP.at && POP.at.type === 'axon' ? POP.at : insts().find(x => x.type === 'axon');
     if (!inst) return;

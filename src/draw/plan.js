@@ -14,7 +14,7 @@ import { wallPieces, GLASS_T } from '../geometry/cell.js';
 import { scanLine } from '../geometry/analysis.js';
 import { sunPatches, SURFACE_NAMES } from '../geometry/room.js';
 import { storeyParts, plateCorners } from '../geometry/storey.js';
-import { W, H, T, L, POLY, RECT, TB, CIRCLE, dim, arc, tickLine, defsCommon, svg, sunKnob, gripMark, mm } from './svg.js';
+import { W, H, T, L, POLY, RECT, TB, CIRCLE, dim, arc, tickLine, defsCommon, svg, sunKnob, gripMark, mm, bboxOf } from './svg.js';
 import { deviceEdit, depthStrings, arrayMembers } from './devedit.js';
 import { siteAcross } from '../geometry/site.js';
 const SITE_LOOK = { line: { stroke: '#A23A16', w: 1.1, dash: '9 3 2 3' }, curb: { stroke: 'var(--ink3)', w: .8, dash: '5 3' }, limit: { stroke: '#C0442B', w: 1, dash: '3 2', op: .85 } };
@@ -230,7 +230,7 @@ export function drawPlan(F, study) {
   if (!blank) {
     const bu = Math.max(m.opening.u1 - m.opening.u0, m.pitch || 0) / 2 + Math.abs(oc), band = [[X(-bu), Y(wallOut)], [X(bu), Y(wallOut)], [X(bu), Y(wallIn)], [X(-bu), Y(wallIn)]];
     planDevHits.push({ pts: band, i: 'win', cut: false });
-    if (EDIT) { body += PB(band, { fill: 'none', stroke: 'var(--glass)', w: 1.2, dash: '4 3' }); planPop = { x: X(oc), y: Y(0), kind: 'window' }; }
+    if (EDIT) { body += PB(band, { fill: 'none', stroke: 'var(--glass)', w: 1.2, dash: '4 3' }); planPop = { x: X(oc), y: Y(0), kind: 'window', box: bboxOf(band.concat(...planDevHits.filter(d => typeof d.i === 'number').map(d => d.pts))) }; }
   }
 
   // the horizontal profile angle, off the fin that governs it

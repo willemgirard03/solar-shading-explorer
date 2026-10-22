@@ -102,6 +102,7 @@ function deviceBody(D, ax, arrayView, min, o = {}) {
   const words = ax === 'V' ? ['Top', 'Middle', 'Bottom'] : ['Left', 'Middle', 'Right'], A = D.arr, along = A && A.along !== 'out', out = A && A.along === 'out';
   const seg = popSeg, grp = popGrp, three = ['start', 'centre', 'end'].map((v, i) => [v, words[i]]);
   let s = o.simple ? popHead(D.name || deviceLabel(D), min) : popHeadName('d.name', D.name || deviceLabel(D), min, '', { kind: 'device', opts: o.devOpts, cur: D.id });
+  if (o.axon) s += `<div class="dvrow">${popBtn('isoWinPick', '', '‹ Window', 'Back to the window: its own handles and pop-over')}${popBtn('isoWin', '', 'Done', 'Back to the whole building (Esc)', 'on')}</div>`;
   const alignTip = arrayView && A && !out ? 'Move the device so its ' + (ax === 'U' ? 'outermost fin’s hinge' : 'outermost member’s hinge') + ' sits on the window’s edge - or its middle on the window’s middle. A move, made once.'
     : arrayView ? 'Move the member so its hinge sits on the window’s edge, or its middle. A move, made once.' : 'Move the member so its end sits on the window’s edge - or its middle on the window’s middle. A move, made once.';
   s += grp('Align', alignTip, seg('d.align' + ax, three));
@@ -113,6 +114,15 @@ function deviceBody(D, ax, arrayView, min, o = {}) {
     s += grp('Justify', 'The end of the member that holds: the handle at its other end lengthens it - both ends, held in the middle', seg('d.just' + ax, three, D['just' + ax]));
     s += grp('Length', 'To window: the window’s own ' + (ax === 'U' ? 'width' : 'height') + ' and what it runs past it, following the window wherever the device is used. Fixed: a length of its own.',
       seg('d.lenRel', [['true', 'To window'], ['false', 'Fixed']], String(lenFromWindow(D))));
+  }
+  // in the building view, along its length too - what the other drawing holds
+  if (o.both) {
+    const ox = ax === 'V' ? 'U' : 'V', ow = ox === 'V' ? ['Top', 'Middle', 'Bottom'] : ['Left', 'Middle', 'Right'], t3 = ['start', 'centre', 'end'].map((v, i) => [v, ow[i]]);
+    s += `<div class="dvsec">Along its length</div>`
+      + grp('Align', 'Move the member so its end sits on the window’s edge - or its middle on the window’s middle. A move, made once.', seg('d.align' + ox, t3))
+      + grp('Justify', 'The end of the member that holds: the handle at its other end lengthens it - both ends, held in the middle', seg('d.just' + ox, t3, D['just' + ox]))
+      + grp('Length', 'To window: the window’s own ' + (ox === 'U' ? 'width' : 'height') + ' and what it runs past it, following the window wherever the device is used. Fixed: a length of its own.',
+        seg('d.lenRel', [['true', 'To window'], ['false', 'Fixed']], String(lenFromWindow(D))));
   }
   // the array: off, one member; on, its direction and setting out
   if (arrayView || out) {
@@ -265,8 +275,8 @@ function controls(type, v) {
       `<div class="laygrp${v.groups[gk] === false ? ' off' : ''}" data-grp="${gk}"><div class="layhd"><label class="chk"><input type="checkbox" data-axg="${gk}" ${v.groups[gk] !== false ? 'checked' : ''}><span><b>${gl}</b></span></label>
         <label class="chk laylab" title="Show or hide this group's figures and names"><input type="checkbox" data-axl="${gk}" ${v.labels[gk] !== false ? 'checked' : ''}><span>Labels</span></label>${opv('g:' + gk, v)}</div>
         ${AX_LAYERS.filter(x => x[2] === gk).map(([k, l]) => `<div class="layrow"><label class="chk layitem"><input type="checkbox" data-ax="${k}" ${v.layers[k] ? 'checked' : ''}><span>${l}</span></label>${opv(k, v)}</div>`).join('')}</div>`).join('')}
-      <label class="barsel angsel"><span class="tipped" title="Where the angle constructions - β, the solar azimuth, γ, the surface azimuth and the profile angle θ - are drawn: on the ground at the foot of the selected facade, at the floor of the selected window's storey, or with their pivot at the middle of the selected window.">Angles drawn</span>
-        <select class="angAt">${opts({ ground: 'On the ground', level: 'At the window’s floor', window: 'About the window' }, v.angAt)}</select></label></div></details>
+      <label class="barsel angsel"><span class="tipped" title="Where the angle constructions - β, the solar azimuth, γ, the surface azimuth and the profile angle θ - are drawn: on the ground at the foot of the selected facade, at the floor of the selected window's storey, with their pivot at the middle of the selected window, at its sill, or at the base of its cut-off - where the profile angle's ray past the shading's outer edge meets the glass, so θ's triangle runs up to that edge.">Angles drawn</span>
+        <select class="angAt">${opts({ ground: 'On the ground', level: 'At the window’s floor', window: 'About the window', sill: 'At the window’s sill', cut: 'At the base of its cut-off' }, v.angAt)}</select></label></div></details>
       <select class="axTyp adv" title="Typology template: choosing one replaces the building - floorplate, storeys and every side's glazing - and keeps the date, time and orientation. None comes with shading except the balconies: that is yours to design." aria-label="Typology template">${Object.entries(TYPOLOGIES).map(([k, t]) => `<option value="${k}" title="${t.about.replace(/"/g, '&quot;')}">${t.label}</option>`).join('')}</select>
       <details class="dd axSite adv"><summary title="The site boundary: streets, lanes and neighbours on each side">Site</summary><div class="ddmenu">
         <button type="button" class="minibtn axBnd" title="Each side of the site boundary: a street, a lane, an adjoining property or open ground. Its lines are pushed and pulled in the view, and their figures typed there.">Site boundary…</button>
