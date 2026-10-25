@@ -110,7 +110,7 @@ export function exportModel(S, scope) {
 
   const res = um ? shadeFraction(um, cur.sl, 61, 49) : null;
   return { layers, solids, curves, scope, info: {
-    tool: 'Vancouver Solar Shading Explorer 7', units: 'mm', axes: 'world, Z up, +Y north; wall face on the plate line',
+    tool: 'Solar Shading Explorer 7', units: 'mm', axes: 'world, Z up, +Y north; wall face on the plate line',
     site: '49.19N 123.18W', northOffset: S.rot || 0,
     selected: { side: sel.f, storey: sel.st + 1, unit: sel.unit === null ? null : sel.unit + 1, facadeAzimuth: +fmt(facadeAzimuth(S, sel.f), 2) },
     date: dateLabel(S.doy), doy: S.doy, hour: S.hour, timeMode: S.timeMode, weather: S.wx,
@@ -150,7 +150,7 @@ export function writeRhino(rhino, model) {
   const free = o => { try { o.delete(); } catch (e) { } };
   const file = new rhino.File3dm();
   file.settings().modelUnitSystem = rhino.UnitSystem.Millimeters;
-  file.applicationName = 'Vancouver Solar Shading Explorer 5';
+  file.applicationName = 'Solar Shading Explorer 5';
   file.applicationDetails = 'Preliminary shading geometry. Solids only; nothing is boolean cut.';
   const idx = {};
   for (const [name, c] of model.layers) {

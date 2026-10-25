@@ -1,6 +1,6 @@
-# Vancouver Solar Shading Explorer — v9
+# Solar Shading Explorer — v9
 
-**Use it online:** <https://willemgirard03.github.io/vancouver-solar-shading-explorer/>
+**Use it online:** <https://willemgirard03.github.io/solar-shading-explorer/>
 
 A teaching tool for solar geometry and shading design. A student shapes a
 shading device and sees, at once:

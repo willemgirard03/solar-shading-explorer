@@ -1,4 +1,4 @@
-/* Vancouver Solar Shading Explorer 8 - the page.
+/* Solar Shading Explorer 8 - the page.
 
    The page takes the question in four steps: where the sun is, what
    the shading cuts off, where the beam lands inside, and how much heat comes

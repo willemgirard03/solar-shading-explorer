@@ -3,13 +3,13 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Vancouver Solar Shading Explorer</title>
+<title>Solar Shading Explorer</title>
 <!-- single-file build of v9: open directly, no server needed -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Condensed:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
-/* Vancouver Solar Shading Explorer 6 */
+/* Solar Shading Explorer 6 */
 :root{
   --paper:#EDF0EE; --panel:#FDFDFC; --ink:#18211F; --ink2:#4B5855; --ink3:#7D8A87;
   --rule:#C7D1CE; --rule2:#DDE4E1;
@@ -726,7 +726,7 @@ label.tipped{display:inline}
 <body>
 <header class="masthead">
   <div>
-    <h1>Vancouver Solar Shading Explorer</h1>
+    <h1>Solar Shading Explorer</h1>
     <p class="sub">Shape a shading device and watch what it does: the sun angles, the profile angle it cuts off, where the beam lands inside, and how much solar heat comes through the glass.</p>
   </div>
   <div class="chips">
@@ -11694,7 +11694,7 @@ entering            q \xD7 sunlit glass area \xD7 SHGC   W</div>
     }
     const res = um ? shadeFraction(um, cur.sl, 61, 49) : null;
     return { layers, solids, curves, scope, info: {
-      tool: "Vancouver Solar Shading Explorer 7",
+      tool: "Solar Shading Explorer 7",
       units: "mm",
       axes: "world, Z up, +Y north; wall face on the plate line",
       site: "49.19N 123.18W",
@@ -11751,7 +11751,7 @@ entering            q \xD7 sunlit glass area \xD7 SHGC   W</div>
     };
     const file = new rhino.File3dm();
     file.settings().modelUnitSystem = rhino.UnitSystem.Millimeters;
-    file.applicationName = "Vancouver Solar Shading Explorer 5";
+    file.applicationName = "Solar Shading Explorer 5";
     file.applicationDetails = "Preliminary shading geometry. Solids only; nothing is boolean cut.";
     const idx = {};
     for (const [name, c] of model.layers) {

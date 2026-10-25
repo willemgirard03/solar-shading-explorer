@@ -25,8 +25,8 @@ if (js.includes('</script')) js = js.replace(/<\/script/g, '<\\/script');       
 const before = html;
 html = html.replace('<link rel="stylesheet" href="styles.css">', () => '<style>\n' + css + '</style>');
 html = html.replace('<script type="module" src="src/main.js"></script>', () => '<script>\n' + js + '</script>');
-html = html.replace('<title>Vancouver Solar Shading Explorer</title>',
-  '<title>Vancouver Solar Shading Explorer</title>\n<!-- single-file build of v9: open directly, no server needed -->');
+html = html.replace('<title>Solar Shading Explorer</title>',
+  '<title>Solar Shading Explorer</title>\n<!-- single-file build of v9: open directly, no server needed -->');
 if (html === before) problems.push('nothing was inlined');
 if (html.includes('src="src/main.js"')) problems.push('the module script tag is still there');
 if (html.includes('href="styles.css"')) problems.push('the stylesheet link is still there');
