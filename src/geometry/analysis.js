@@ -129,11 +129,15 @@ export function scanLine(m, sl, onFacade, axis, at, n = 260) {
   return segs;
 }
 
+/** how high the sky masks reach: the top of the sun charts, 3 degree rows */
+let MASK_ALT = 72;
+export const setMaskAlt = a => { MASK_ALT = a; };
+
 /* ---------- the sky mask ----------
    The shaded fraction for every 3 x 3 degree cell of the half-sky the facade
    sees, on a coarse 7 x 5 grid on the opening. */
 export function computeMask(m) {
-  const dAz = 3, nAz = 60, dAlt = 3, nAlt = 24, az0 = m.gf - 90;
+  const dAz = 3, nAz = 60, dAlt = 3, nAlt = Math.ceil(MASK_ALT / 3), az0 = m.gf - 90;
   const cells = new Float32Array(nAz * nAlt);
   for (let i = 0; i < nAz; i++) for (let j = 0; j < nAlt; j++)
     cells[i * nAlt + j] = shadeFraction(m, sunLocal((j + 0.5) * dAlt, az0 + (i + 0.5) * dAz, m.gf), 7, 5).frac;
@@ -402,7 +406,7 @@ export function fracW(T, alt, az, nu, nv) {
 }
 /** the mask over the whole sky: every 3 degrees of bearing round the horizon */
 export function computeMaskW(T) {
-  const dAz = 3, nAz = 120, dAlt = 3, nAlt = 24, az0 = 0;
+  const dAz = 3, nAz = 120, dAlt = 3, nAlt = Math.ceil(MASK_ALT / 3), az0 = 0;
   const cells = new Float32Array(nAz * nAlt);
   for (let i = 0; i < nAz; i++) for (let j = 0; j < nAlt; j++)
     cells[i * nAlt + j] = fracW(T, (j + 0.5) * dAlt, az0 + (i + 0.5) * dAz, 7, 5);

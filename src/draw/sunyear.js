@@ -37,6 +37,8 @@ function palette() {
 }
 
 let img = { key: '', url: null };
+/** the year's chart drawn afresh, for a new place */
+export const clearYear = () => { img = { key: '', url: null }; };
 /** the year painted: a day a column, a quarter hour a row, on the clock given */
 function yearImage(Hh, mode, key) {
   if (typeof document === 'undefined') return null;          // the test suite has no canvas

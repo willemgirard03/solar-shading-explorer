@@ -9,7 +9,7 @@
    the chart is redrawn every frame while the day is playing.                */
 
 import { clamp, fmt, wrap180, dateLabel, hhmm } from '../util.js';
-import { solarPosition, CLOCK_NAME, sunriseSunsetSolar, solarToClock } from '../solar.js';
+import { solarPosition, CLOCK_NAME, sunriseSunsetSolar, solarToClock, SITE } from '../solar.js';
 import { facadeWWR, SCOPES, FACADES } from '../geometry/building.js';
 /** glazed over opaque for every side a multi-side target takes in, storey or building */
 function multiWWR(B, TG) {
@@ -29,7 +29,10 @@ import { W, H, El, T, L, POLY, PATH, RECT, CIRCLE, TB, defsCommon, svg } from '.
 // the solstices and the equinox - March's and September's paths all but lie on each other, so one stands for both
 const PATH_DOYS = [355, 172];
 const NOON_LABELS = { 172: '21 Jun', 355: '21 Dec' };
-export const bearing = az => wrap180(az - 180);
+/* The chart faces the equator: centred on due south north of it, on due north
+   south of it, so the sun's path is never split across the chart's edges. */
+export const CHART_C = () => SITE.lat < 0 ? 180 : 0;
+export const bearing = az => wrap180(az - 180 - CHART_C());
 
 /* The cut-offs set on the chart, for the optimization's From chart: the
    profile angle θ's curve, alt = tan⁻¹(tan θ cos γ), with a grip at its apex on
@@ -205,7 +208,8 @@ function reachArcs() {
     }
     return out.sort((a, b) => a[0] - b[0]);
   };
-  return (REACH = { jun: sample(172), dec: sample(355) });
+  // 'jun' is the summer path - the highest - whichever solstice that is here
+  return (REACH = SITE.lat < 0 ? { jun: sample(355), dec: sample(172) } : { jun: sample(172), dec: sample(355) });
 }
 const arcAt = (arr, b) => {
   if (!arr.length || b < arr[0][0] || b > arr[arr.length - 1][0]) return null;
@@ -327,10 +331,10 @@ function backdrop(F, G) {
   // lettered every 30 degrees from south, whichever width the chart is
   for (let a = -150; a <= 150; a += 30) {
     if (a === 0 || a <= AZ0 || a >= AZ1) continue;
-    g += T(px(a), Y1 + 13, Math.abs(a) + '°' + (a < 0 ? 'E' : 'W'), { anchor: 'middle', size: 8.5, fill: 'var(--ink3)' });
+    g += T(px(a), Y1 + 13, Math.abs(a) + '°' + ((a < 0) === !CHART_C() ? 'E' : 'W'), { anchor: 'middle', size: 8.5, fill: 'var(--ink3)' });
   }
-  g += T(px(0), Y1 + 13, 'S', { anchor: 'middle', size: 9.5, fill: 'var(--ink)' });
-  g += T(X0, Y0 - 24, 'Solar bearing from due south × altitude', { size: 10.5, fill: 'var(--ink2)', mono: false });
+  g += T(px(0), Y1 + 13, CHART_C() ? 'N' : 'S', { anchor: 'middle', size: 9.5, fill: 'var(--ink)' });
+  g += T(X0, Y0 - 24, 'Solar bearing from due ' + (CHART_C() ? 'north' : 'south') + ' × altitude', { size: 10.5, fill: 'var(--ink2)', mono: false });
   g += T(X0, Y0 - 11, 'white: the whole opening in sun · darker: more of it shaded · solid: none of it lit', { size: 8.5, fill: 'var(--ink3)', mono: false });
   g += T(X1, Y0 - 24, 'drag sun, strip or bearing', { anchor: 'end', size: 8.5, fill: 'var(--glass)', cls: 'hovxy' });
   g += T(X0 - 6, Y0 - 3, 'alt', { anchor: 'end', size: 8, fill: 'var(--ink3)' });
@@ -408,7 +412,7 @@ function backdrop(F, G) {
   g += POLY([[px(fb), Y1], [px(fb) - 7, Y1 + 11], [px(fb) + 7, Y1 + 11]], { fill: 'var(--glass)' });
   g += RECT(px(fb) - 7, Y1 + 11, 14, 5, { rx: 1.5, fill: 'var(--glass)' });
   const anch = px(fb) > X1 - 90 ? 'end' : 'start';
-  g += TB(px(fb) + (anch === 'end' ? -7 : 7), Y1 - 34, 'surface azimuth ' + (Math.abs(fb) < 0.5 ? '0' : fmt(fb, 0)) + '°', { anchor: anch, size: 8.5, fill: 'var(--glass)', bg: .9 });
+  g += TB(px(fb) + (anch === 'end' ? -7 : 7), Y1 - 34, 'surface azimuth ' + (Math.abs(wrap180(fb + CHART_C())) < 0.5 ? '0' : fmt(wrap180(fb + CHART_C()), 0)) + '°', { anchor: anch, size: 8.5, fill: 'var(--glass)', bg: .9 });
 
   // the day on a strip laid on the chart's axis, so the clock runs under the sun
   const ds = getDaySpan(TG, doy, S.timeMode), spans = litSpans(lit), st = dayStrip(G, doy, S.timeMode);
@@ -480,7 +484,7 @@ export function drawSunPath(F) {
     g += CIRCLE(x, y, 9.5, { fill: 'var(--sun)', opacity: .18 });
     g += CIRCLE(x, y, 5.5, { fill: 'var(--sun)', stroke: 'var(--panel)', 'stroke-width': 1.6 });
     const above = y - 13 > Y0 + 6;
-    g += TB(x, above ? y - 13 : y + 20, 'β ' + fmt(cur.alt, 1) + '° · az ' + fmt(bearing(cur.az), 1) + '°', { anchor: 'middle', size: 8.5, fill: 'var(--sun)', bg: .9 });
+    g += TB(x, above ? y - 13 : y + 20, 'β ' + fmt(cur.alt, 1) + '° · az ' + fmt(wrap180(cur.az - 180), 1) + '°', { anchor: 'middle', size: 8.5, fill: 'var(--sun)', bg: .9 });
   } else {
     g += TB((X0 + X1) / 2, (Y0 + Y1) / 2, 'sun below the horizon', { anchor: 'middle', size: 11, fill: 'var(--ink3)', bg: .9 });
   }
@@ -493,4 +497,4 @@ export function drawSunPath(F) {
   }
   return svg(g, 'Cartesian sun path chart for Vancouver with the shading mask of the current device');
 }
-export const clearSunCache = () => { cache.key = ''; };
+export const clearSunCache = () => { cache.key = ''; strip.key = ''; ghostEnv.key = ''; REACH = null; };

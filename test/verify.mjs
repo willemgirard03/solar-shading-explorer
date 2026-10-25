@@ -22,7 +22,9 @@ import { defaultState, applyCase, setValue, addWindow, CASES, TYPOLOGIES, applyT
   saveWindow, openWindow, selectionChanged, keepCuts, windowState, shadingFromIdeal, selSystem, addContextAt, removeContext, siteOf, duplicateContext,
   instanceContext, makeUnique, contextSnaps, pullContext, turnContext, putContext, plateTo,
   addShading, saveEntry, copyEntry, copyName, addSavedWindow, selShading, applySitePreset, rotateSite, liveToggle, liveApply, liveOff, unlinkSides, fitsSimple, windowEachSide } from '../src/state.js';
-import { parseEpw } from '../src/weather.js';
+import { parseEpw, addWeather, placeOf } from '../src/weather.js';
+import { setSite, SITE0 } from '../src/solar.js';
+import * as studiesMod from '../src/studies.js';
 import { contextPlace, contextBoxes } from '../src/geometry/building.js';
 import { flatGlazing, usage } from '../src/library.js';
 import { siteChecks, siteFrame, insideBy } from '../src/geometry/site.js';
@@ -777,6 +779,25 @@ section('6. The state');
     const tall = defaultState(); applyTypology('resTower', tall); const low = defaultState(); applyTypology('blank', low);
     check('an .epw read in hour by hour; a corner lot, turned a side round; a tall typology starts with its windows carried up its floors',
       epwOk && corner && turned && tall.matchAbove.glazing && !low.matchAbove.glazing, [epwOk, corner, turned, tall.matchAbove.glazing, !low.matchAbove.glazing].join(' '));
+  }
+  // a weather file from somewhere else sets where the sun is: its latitude, longitude and time zone, and the monthly figures worked from it
+  {
+    const rows = [];
+    for (let d = 0; d < 365; d++) for (let h = 1; h <= 24; h++) {
+      const date = new Date(Date.UTC(2021, 0, 1 + d)), mo = date.getUTCMonth() + 1, dy = date.getUTCDate();
+      rows.push([2021, mo, dy, h, 60, '?', 20, 5, 70, 101000, 0, 0, 300, h > 6 && h < 19 ? 500 : 0, h > 6 && h < 19 ? 600 : 0, 100].join(','));
+    }
+    const epw = ['LOCATION,Sydney,NSW,AUS,TEST,947670,-33.95,151.18,10.0,6.0', 'DESIGN', 'TYPICAL', 'GROUND', 'HOLIDAYS', 'COMMENTS 1', 'COMMENTS 2', 'DATA PERIODS'].concat(rows).join(String.fromCharCode(10));
+    const w = parseEpw(epw), key = addWeather('Sydney test', w), p = placeOf(key);
+    setSite(p); studiesMod.setAltMax(p.lat);
+    const noon = solarPosition(172, 12, 'sol'), clockNoon = solarPosition(172, 12, 'lst');
+    const placed = Math.abs(p.lat + 33.95) < 1e-9 && p.tz === 10 && p.place === 'Sydney';
+    const sun = Math.abs(noon.alt - (90 - 33.95 - 23.45)) < 0.6 && (noon.az < 1 || noon.az > 359) && Math.abs(clockNoon.alt - noon.alt) < 2;
+    const climate = w.climate && w.climate.dni[0][12] === 600 && w.climate.ndays[1] === 28 && w.climate.tmean === 20 && studiesMod.ALT_MAX === 88;
+    setSite(SITE0); studiesMod.setAltMax(SITE0.lat);
+    const back = Math.abs(solarPosition(172, 12, 'sol').alt - 64.26) < 0.2 && placeOf('gw10').lat === 49.19 && studiesMod.ALT_MAX === 72;
+    check('a weather file from elsewhere moves the sun to its place - Sydney at noon on 21 June is low in the north - and brings its monthly figures', placed && sun && climate && back,
+      [placed, sun, climate, back, fmt(noon.alt, 1), fmt(noon.az, 1)].join(' '));
   }
   // live optimization: the ideal written into the window's own members, remade in place as it changes, left behind when turned off
   {

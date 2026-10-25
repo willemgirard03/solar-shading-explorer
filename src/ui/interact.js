@@ -12,7 +12,7 @@ import { FACADES, MULTI, facadeAzimuth, buildBuilding, resolveSel, unitModel, bl
 import { AXCAM0, DETCAM0 } from '../view.js';
 import { setValue, getValue, contextSnaps, selDevice } from '../state.js';
 import { buildDevice, isLive } from '../geometry/device.js';
-import { sunGeom, bearing, dayStrip, cutAt } from '../draw/sunpath.js';
+import { sunGeom, bearing, dayStrip, cutAt, CHART_C } from '../draw/sunpath.js';
 import { yearGeom } from '../draw/sunyear.js';
 import { detailCamera, cutLimits, cutPlanes } from '../draw/detail.js';
 import { axonCamera } from '../draw/axon.js';
@@ -234,7 +234,7 @@ export function wireView(inst, app) {
     if (mode === 'bear' || (mode === null && onBearing)) {
       mode = 'bear'; app.stopPlay(); G0.sunFast = true; H.mark('bearing');
       const b = clamp((v[0] - G.X0) / (G.X1 - G.X0) * (G.AZ1 - G.AZ0) + G.AZ0, G.AZ0, G.AZ1);
-      setValue('rot', wrap180(Math.round((S.rot || 0) + wrap180(wrap360(b + 180) - facadeAzimuth(S, S.sel.f)))), S);
+      setValue('rot', wrap180(Math.round((S.rot || 0) + wrap180(wrap360(b + 180 + CHART_C()) - facadeAzimuth(S, S.sel.f)))), S);
       app.scheduleLight(); return true;
     }
     if (mode === 'strip' || (mode === null && onStrip)) {
@@ -271,7 +271,7 @@ export function wireView(inst, app) {
     const b = (v[0] - G.X0) / (G.X1 - G.X0) * (G.AZ1 - G.AZ0) + G.AZ0, alt = (G.Y1 - v[1]) / (G.Y1 - G.Y0) * ALT_MAX, gam = wrap180(G.fb - b);
     const th = Math.abs(gam) < 90 ? Math.atan2(Math.tan(alt * Math.PI / 180), Math.cos(gam * Math.PI / 180)) * 180 / Math.PI : null;
     const f1 = x => (Math.round(x * 10) / 10).toFixed(1).replace('-', '−');
-    t.textContent = 'β ' + f1(alt) + '° · az ' + f1(b) + '° · γ ' + f1(gam) + '°' + (th === null ? ' · behind the facade' : ' · θ ' + f1(th) + '°');
+    t.textContent = 'β ' + f1(alt) + '° · az ' + f1(wrap180(b + CHART_C())) + '° · γ ' + f1(gam) + '°' + (th === null ? ' · behind the facade' : ' · θ ' + f1(th) + '°');
     t.setAttribute('fill', 'var(--ink)');
   }
   const sunEnd = e => {

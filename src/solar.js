@@ -10,9 +10,22 @@
 
 import { D2R, R2D, clamp, wrap360, wrap180 } from './util.js';
 
-/** taken from the weather-file header */
-export const SITE = { lat: 49.19, lon: -123.18, tzMeridian: -120, tz: -8 };
+/** the tool's own place, from its weather files' header: Vancouver */
+export const SITE0 = { lat: 49.19, lon: -123.18, tz: -8, place: 'Vancouver' };
+/** the place the sun is worked out for - the weather file in use's, set by setSite */
+export const SITE = { lat: 49.19, lon: -123.18, tzMeridian: -120, tz: -8, place: 'Vancouver', key: '' };
 export const CLOCK_NAME = { lst: 'UTC−8 (PST)', pdt: 'UTC−7 (PDT)', sol: 'solar' };
+const utc = n => 'UTC' + (n < 0 ? '−' : '+') + Math.abs(n);
+/** the latitude, longitude and time zone the sun is worked out for, and the clocks named for that zone */
+export function setSite(o) {
+  SITE.lat = o.lat; SITE.lon = o.lon; SITE.tz = o.tz; SITE.tzMeridian = o.tz * 15; SITE.place = o.place || '';
+  SITE.key = [o.lat, o.lon, o.tz].join(',');
+  const pacific = o.tz === -8;
+  CLOCK_NAME.lst = utc(o.tz) + (pacific ? ' (PST)' : ' standard');
+  CLOCK_NAME.pdt = utc(o.tz + 1) + (pacific ? ' (PDT)' : ' daylight');
+}
+/** the highest the sun climbs here, on either solstice */
+export const peakAltitude = (lat = SITE.lat) => Math.min(90, 90 - Math.abs(lat) + 23.45);
 
 export function equationOfTime(doy) {               // minutes
   const B = (doy - 81) * 360 / 364 * D2R;

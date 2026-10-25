@@ -10,13 +10,17 @@ import { computeMaskT, envelopeT, annualStudyBy, daySamplesBy, dailyProfileBy, f
   computeMaskW, annualStudyW, daySamplesW, dailyProfileW, daySpanW } from './geometry/analysis.js';
 import { doyOf } from './util.js';
 import { CLIMATE } from './data/climate.js';
+import { setMaskAlt } from './geometry/analysis.js';
 
-export const ALT_MAX = 72;                // Vancouver peaks at 64.3 deg on 21 Jun
+/** the top of the sun charts: a little above the highest the sun climbs here - 72 deg at Vancouver, where it peaks at 64.3 */
+export let ALT_MAX = 72;
+export function setAltMax(lat) { ALT_MAX = Math.min(90, Math.max(40, Math.ceil(Math.min(90, 90 - Math.abs(lat) + 23.45) + 7.7))); setMaskAlt(ALT_MAX); }
 const C = { mask: null, env: { key: '', real: null, ideal: null }, annual: { key: '', v: null }, day: { key: '', v: null }, prof: { key: '', v: null } };
 
 export function resetStudies() {
   C.mask = null; C.env = { key: '', real: null, ideal: null };
   C.annual = { key: '', v: null }; C.day = { key: '', v: null }; C.prof = { key: '', v: null };
+  if (typeof G !== 'undefined') { G.day = { key: '', v: null }; G.hours = { key: '', v: null }; FL.day.clear(); FL.year.clear(); }
 }
 
 /** the mask as it stands; computed now only if there is none at all */

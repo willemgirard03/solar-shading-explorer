@@ -32,7 +32,11 @@ import { drawDetail, DETAIL_VIEWS, detailSun, detailHits, detailEye, detailWinPo
 import { drawAxon, axonHits, axonHandle, axonFocus, axonCtxHits, axonCtxEdit, axonCamera, axonPlateEdit, axonWinPop, axonSiteLines, axonSiteMids } from './draw/axon.js';
 import { drawSunYear } from './draw/sunyear.js';
 import { chartGainDay, chartGainYear, chartShadeYear } from './draw/charts.js';
-import { WEATHER_FILES, parseEpw, addWeather } from './weather.js';
+import { WEATHER_FILES, parseEpw, addWeather, placeOf } from './weather.js';
+import { SITE, setSite } from './solar.js';
+import { setAltMax } from './studies.js';
+import { clearDome } from './draw/axon.js';
+import { clearYear } from './draw/sunyear.js';
 import { titleBlock, setSheet, SHEET0 } from './draw/svg.js';
 import { sheetFor, buildLayout, wireLayout, margins, removeView, saveLayout } from './ui/layout.js';
 import { dotsOpts, createView, VIEW_TYPES, devicePopHTML, windowPopHTML, emptyPopHTML, storeyPopHTML, sitePopHTML, ctxPopHTML } from './ui/views.js';
@@ -653,7 +657,23 @@ document.addEventListener('click', e => {
     else if (m) api.act('liveOff', m);
   }
 });
+/* The weather file in use says where the sun is: its latitude, longitude and
+   time zone. A file with another place moves the sun, renames the clocks and
+   has every sky drawing and study worked out again. */
+function placeFromWeather() {
+  const p = placeOf(S.wx), key = [p.lat, p.lon, p.tz].join(',');
+  if (key === SITE.key) return;
+  setSite(p); setAltMax(p.lat);
+  resetStudies(); resetGains(); clearSunCache(); clearDome(); clearYear();
+  const deg = (x, pos, neg) => Math.abs(x).toFixed(2) + '°' + (x >= 0 ? pos : neg);
+  const pc = $('placeChip'), zc = $('zoneChip');
+  if (pc) { pc.innerHTML = ''; pc.append(deg(p.lat, 'N', 'S') + ' ' + deg(p.lon, 'E', 'W') + ' · '); const b = document.createElement('b'); b.textContent = p.place || 'imported'; pc.append(b); }
+  if (zc) zc.innerHTML = 'UTC<b>' + (p.tz < 0 ? '−' : '+') + Math.abs(p.tz) + '</b>';
+  const cs = $('c_timeMode');
+  if (cs) for (const o of cs.options) if (CLOCK_NAME[o.value] && o.value !== 'sol') o.textContent = CLOCK_NAME[o.value];
+}
 function render(light = false) {
+  placeFromWeather();
   liveUpdate();
   showBylaw();
   // the cuts kept in the saved window that is the selection, however they were moved
@@ -1262,7 +1282,7 @@ wireRail($('rail'), S, api);
     const f = inp.files && inp.files[0];
     if (!f) return;
     try {
-      const rec = parseEpw(await f.text()), name = f.name.replace(/\.epw$/i, '') + (rec.tz !== -8 && isFinite(rec.tz) ? ' (UTC' + (rec.tz >= 0 ? '+' : '−') + Math.abs(rec.tz) + ', read as PST)' : '');
+      const rec = parseEpw(await f.text()), name = f.name.replace(/\.epw$/i, '') + (rec.place ? ' (' + rec.place + ')' : '');
       const key = addWeather(name, rec), o = document.createElement('option');
       o.value = key; o.textContent = name; sel.insertBefore(o, sel.querySelector('option[value="__epw"]'));
       api.set('wx', key); clearSunCache();

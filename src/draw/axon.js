@@ -38,6 +38,8 @@ const ringPts = (r, z, n = 96) => Array.from({ length: n + 1 }, (_, i) => compas
 /* the sun path on the dome does not depend on the camera, so it is built once
    per dome radius and reused on every orbit frame */
 let arcs = { R: 0, mode: null, months: null, days: {} };
+/** the dome's paths and hours drawn afresh, for a new place */
+export function clearDome() { arcs = { R: 0, mode: null, months: null, days: {} }; scene = { key: '', units: [], lines: [] }; }
 function arcRuns(doy, R) {
   const runs = []; let run = null;
   for (let t = 0; t <= 24.001; t += 0.1) {
