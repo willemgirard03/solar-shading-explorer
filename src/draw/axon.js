@@ -525,6 +525,8 @@ export function drawAxon(F) {
   // Advanced isolates the window to edit it; Simple edits the selected window and its shading where they stand
   const direct = S.mode === 'simple' && S.sel.unit !== null && (S.pick === 'window' || S.pick === 'device');
   const iso = !!((V.iso || direct) && F.sel.unit !== null && m.opening);
+  // one short line at the top of the drawing says what is selected and how to let it go - the last thing selected says it
+  let hint = null;
   let selPr = null, selO = null;
   // a layer shows when it is on and its group is on
   const Ly = Object.fromEntries(Object.entries(V.layers).map(([k, on]) => [k, on && (V.groups || {})[GROUP_OF[k]] !== false]));
@@ -1045,8 +1047,7 @@ export function drawAxon(F) {
       g += lab(side, 'h ' + mm(m.winH), fillH ? undefined : 'g.winH', 34, 4);
       g += lab(pr([o.u0, o.v0, 0]), 'sill ' + mm(m.sill), 'g.sillK', -30, 14);
     }
-    g += T(12, 56, winEd ? (V.iso ? 'window isolated' : 'window selected') + ': drag its jambs, sill and head, or the middle of the pane for its set-back · click a device to edit it, or drag a member of an array to change how many · click a figure to type it' + (V.iso ? ' · Esc or Done to finish' : '')
-      : 'device picked: drag its depth, turn, length and array, or its gumball (Alt-drag for a copy) · click the glass or Window for the window\'s own handles · Esc or Done to finish', { size: 8.5, fill: 'var(--glass)' });
+    if (V.iso) hint = 'Isolated window view · Esc to exit';
     axonIso = grips;
   }
   // the selected storey, ready to edit in place
@@ -1054,8 +1055,7 @@ export function drawAxon(F) {
   if (V.plate && V.plate.on && !(iso && V.iso)) {
     const pe = plateEdit(F, sel.st, zbs[sel.st], cam, P);
     g += pe.g; axonPlateEdit = pe.edit;
-    g += T(12, 56, sel.st === 0 ? 'ground floor selected: it stays centred on the site · pull a face · pull its top for its height · turn it by its arc · click a figure to type it'
-      : 'storey ' + (sel.st + 1) + ' selected: move it by its arrows, or freely by the square between them · pull a face · pull its top for its height · turn it by its arc · drag a window to space them · click a figure to type it' + (S.matchAbove.plate ? ' · the floors above follow' : ''), { size: 8.5, fill: 'var(--glass)' });
+    if (!iso) hint = (sel.st === 0 ? 'Ground floor' : 'Storey ' + (sel.st + 1)) + ' selected · Esc to deselect';
   }
   // the selected side's window array, bracketed as a drawing program brackets an array: its number and its spacing typed over
   if (!iso && (V.plate && V.plate.on || F.pick === 'window') && sel.row.cell && sel.row.units.length && S.mode !== 'simple') g += windowBracket(F, cam, P);
@@ -1073,8 +1073,8 @@ export function drawAxon(F) {
       const cs = boxCorners(b);
       g += POLY(cs.slice(0, 4).map(P), { fill: 'none', stroke: 'var(--glass)', w: 1, dash: '2 3' }) + POLY(cs.slice(4).map(P), { fill: 'none', stroke: 'var(--glass)', w: 1, dash: '2 3' });
     }
-    const who = mates.length ? 'obstruction, one of ' + (mates.length + 1) + ' instances' + (cSel.inheritRot ? ', passing its turns on' : '') + ' · ' : 'obstruction selected: ';
-    g += T(12, 56, who + 'drag it to move' + (S.mode !== 'simple' ? ' (Alt: a copy or instance)' : '') + ' · pull a face · turn it by its ring · click a figure to type it · Delete removes it', { size: 8.5, fill: 'var(--glass)' });
+    hint = (mates.length ? 'Obstruction, one of ' + (mates.length + 1) + ' instances' : 'Obstruction selected') + ' · Delete removes it · Esc to deselect';
   }
+  if (hint) g += T(12, 56, hint, { size: 8.5, fill: 'var(--glass)' });
   return svg(g, 'Interactive 3D view of the block with the sun path dome, compass and solar angle constructions');
 }

@@ -7643,6 +7643,7 @@ label.tipped{display:inline}
     axonRay = null;
     const direct = S2.mode === "simple" && S2.sel.unit !== null && (S2.pick === "window" || S2.pick === "device");
     const iso = !!((V2.iso || direct) && F.sel.unit !== null && m.opening);
+    let hint = null;
     let selPr = null, selO = null;
     const Ly = Object.fromEntries(Object.entries(V2.layers).map(([k, on]) => [k, on && (V2.groups || {})[GROUP_OF[k]] !== false]));
     const Lb = V2.labels || {};
@@ -8202,7 +8203,7 @@ label.tipped{display:inline}
         g += lab(side, "h " + mm(m.winH), fillH ? void 0 : "g.winH", 34, 4);
         g += lab(pr([o.u0, o.v0, 0]), "sill " + mm(m.sill), "g.sillK", -30, 14);
       }
-      g += T(12, 56, winEd ? (V2.iso ? "window isolated" : "window selected") + ": drag its jambs, sill and head, or the middle of the pane for its set-back \xB7 click a device to edit it, or drag a member of an array to change how many \xB7 click a figure to type it" + (V2.iso ? " \xB7 Esc or Done to finish" : "") : "device picked: drag its depth, turn, length and array, or its gumball (Alt-drag for a copy) \xB7 click the glass or Window for the window's own handles \xB7 Esc or Done to finish", { size: 8.5, fill: "var(--glass)" });
+      if (V2.iso) hint = "Isolated window view \xB7 Esc to exit";
       axonIso = grips;
     }
     axonPlateEdit = null;
@@ -8210,7 +8211,7 @@ label.tipped{display:inline}
       const pe = plateEdit(F, sel.st, zbs[sel.st], cam, P);
       g += pe.g;
       axonPlateEdit = pe.edit;
-      g += T(12, 56, sel.st === 0 ? "ground floor selected: it stays centred on the site \xB7 pull a face \xB7 pull its top for its height \xB7 turn it by its arc \xB7 click a figure to type it" : "storey " + (sel.st + 1) + " selected: move it by its arrows, or freely by the square between them \xB7 pull a face \xB7 pull its top for its height \xB7 turn it by its arc \xB7 drag a window to space them \xB7 click a figure to type it" + (S2.matchAbove.plate ? " \xB7 the floors above follow" : ""), { size: 8.5, fill: "var(--glass)" });
+      if (!iso) hint = (sel.st === 0 ? "Ground floor" : "Storey " + (sel.st + 1)) + " selected \xB7 Esc to deselect";
     }
     if (!iso && (V2.plate && V2.plate.on || F.pick === "window") && sel.row.cell && sel.row.units.length && S2.mode !== "simple") g += windowBracket(F, cam, P);
     if (V2.plate && V2.plate.on && !iso) g += shgcLabels(F, cam, P, sel.f);
@@ -8225,9 +8226,9 @@ label.tipped{display:inline}
         const cs = boxCorners2(b);
         g += POLY(cs.slice(0, 4).map(P), { fill: "none", stroke: "var(--glass)", w: 1, dash: "2 3" }) + POLY(cs.slice(4).map(P), { fill: "none", stroke: "var(--glass)", w: 1, dash: "2 3" });
       }
-      const who = mates.length ? "obstruction, one of " + (mates.length + 1) + " instances" + (cSel.inheritRot ? ", passing its turns on" : "") + " \xB7 " : "obstruction selected: ";
-      g += T(12, 56, who + "drag it to move" + (S2.mode !== "simple" ? " (Alt: a copy or instance)" : "") + " \xB7 pull a face \xB7 turn it by its ring \xB7 click a figure to type it \xB7 Delete removes it", { size: 8.5, fill: "var(--glass)" });
+      hint = (mates.length ? "Obstruction, one of " + (mates.length + 1) + " instances" : "Obstruction selected") + " \xB7 Delete removes it \xB7 Esc to deselect";
     }
+    if (hint) g += T(12, 56, hint, { size: 8.5, fill: "var(--glass)" });
     return svg(g, "Interactive 3D view of the block with the sun path dome, compass and solar angle constructions");
   }
 
