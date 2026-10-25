@@ -65,8 +65,13 @@ body.simple .adv, body.simple .laygrp[data-grp="site"], body:not(.simple) .simpl
 .vbtns .vb svg, #dockFull svg{display:block}
 .vbtns .vb[data-vfull], #dockFull{display:inline-flex; align-items:center; justify-content:center}
 .minibtn.iconbtn{display:inline-flex; align-items:center; justify-content:center; padding:3px 6px; line-height:0}
-.masthead .modeseg{display:inline-flex; align-self:center}
-.modeseg button[aria-pressed="true"]{background:var(--ink); color:var(--panel); border-color:var(--ink)}
+/* the mode: one switch, a track with its name, the mode in use lifted out of it */
+.masthead .modeseg{display:inline-flex; align-items:center; align-self:center; gap:2px; padding:3px; border:1px solid var(--rule); border-radius:999px; background:var(--paper)}
+.modeseg .modelab{font:600 10px var(--sans); letter-spacing:.09em; text-transform:uppercase; color:var(--ink3); padding:0 6px 0 9px}
+.modeseg button{display:inline-flex; align-items:center; gap:6px; margin:0; border:0; border-radius:999px; background:transparent; padding:5px 12px; font:500 12.5px var(--sans); color:var(--ink2); cursor:pointer; transition:background .15s, color .15s}
+.modeseg button:hover{color:var(--ink); background:var(--glasssoft)}
+.modeseg button[aria-pressed="true"]{background:var(--glass); color:#fff; box-shadow:0 1px 3px rgba(0,0,0,.22); cursor:default}
+.modeseg button svg{display:block}
 .ctxmenu .popnote{display:block; margin:0 4px 6px; font-size:12px; color:var(--ink2); max-width:250px; line-height:1.35}
 /* the panel is empty: everything it held is on the drawings, their bars and small windows, and the settings bar */
 .shell>.rail{display:none}

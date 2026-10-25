@@ -811,7 +811,7 @@ function applyMode() {
   document.body.classList.toggle('simple', simple);
   V.simple = simple;
   if (simple) S.scope = 'unit';
-  document.querySelectorAll('.modeseg [data-mode]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.mode === S.mode)));
+  document.querySelectorAll('.modeseg [data-mode]').forEach(b => { b.setAttribute('aria-pressed', String(b.dataset.mode === S.mode)); b.setAttribute('aria-checked', String(b.dataset.mode === S.mode)); });
   try { localStorage.setItem(MODE_KEY, S.mode); } catch (_) { }
 }
 let modeTo = null;

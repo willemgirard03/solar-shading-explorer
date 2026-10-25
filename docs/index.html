@@ -76,8 +76,13 @@ body.simple .adv, body.simple .laygrp[data-grp="site"], body:not(.simple) .simpl
 .vbtns .vb svg, #dockFull svg{display:block}
 .vbtns .vb[data-vfull], #dockFull{display:inline-flex; align-items:center; justify-content:center}
 .minibtn.iconbtn{display:inline-flex; align-items:center; justify-content:center; padding:3px 6px; line-height:0}
-.masthead .modeseg{display:inline-flex; align-self:center}
-.modeseg button[aria-pressed="true"]{background:var(--ink); color:var(--panel); border-color:var(--ink)}
+/* the mode: one switch, a track with its name, the mode in use lifted out of it */
+.masthead .modeseg{display:inline-flex; align-items:center; align-self:center; gap:2px; padding:3px; border:1px solid var(--rule); border-radius:999px; background:var(--paper)}
+.modeseg .modelab{font:600 10px var(--sans); letter-spacing:.09em; text-transform:uppercase; color:var(--ink3); padding:0 6px 0 9px}
+.modeseg button{display:inline-flex; align-items:center; gap:6px; margin:0; border:0; border-radius:999px; background:transparent; padding:5px 12px; font:500 12.5px var(--sans); color:var(--ink2); cursor:pointer; transition:background .15s, color .15s}
+.modeseg button:hover{color:var(--ink); background:var(--glasssoft)}
+.modeseg button[aria-pressed="true"]{background:var(--glass); color:#fff; box-shadow:0 1px 3px rgba(0,0,0,.22); cursor:default}
+.modeseg button svg{display:block}
 .ctxmenu .popnote{display:block; margin:0 4px 6px; font-size:12px; color:var(--ink2); max-width:250px; line-height:1.35}
 /* the panel is empty: everything it held is on the drawings, their bars and small windows, and the settings bar */
 .shell>.rail{display:none}
@@ -724,7 +729,7 @@ label.tipped{display:inline}
   <div class="chips">
     <span class="chip">49.19&deg;N 123.18&deg;W &middot; <b>Vancouver</b></span>
     <span class="chip">UTC<b>&minus;8</b></span>
-    <span class="seg mini modeseg" title="Simple: one storey with one window on each side, shading devices kept on each window, results for the selected window - the tool at its plainest. Advanced: storeys, window arrays, site boundaries and streets, linked shading groups, the library, typologies and export."><button type="button" data-mode="simple" aria-pressed="true">Simple</button><button type="button" data-mode="advanced" aria-pressed="false">Advanced</button></span>
+    <span class="modeseg" role="radiogroup" aria-label="Mode" title="Simple: one storey with one window on each side, shading devices kept on each window, results for the selected window - the tool at its plainest. Advanced: storeys, window arrays, site boundaries and streets, linked shading groups, the library, typologies and export."><span class="modelab" aria-hidden="true">Mode</span><button type="button" role="radio" data-mode="simple" aria-pressed="true"><svg viewBox="0 0 14 14" width="13" height="13" aria-hidden="true"><rect x="2.5" y="4" width="9" height="7.5" fill="none" stroke="currentColor" stroke-width="1.4"/></svg>Simple</button><button type="button" role="radio" data-mode="advanced" aria-pressed="false"><svg viewBox="0 0 14 14" width="13" height="13" aria-hidden="true"><rect x="2.5" y="8.5" width="9" height="3.5" fill="none" stroke="currentColor" stroke-width="1.3"/><rect x="2.5" y="5" width="9" height="3.5" fill="none" stroke="currentColor" stroke-width="1.3"/><rect x="2.5" y="1.5" width="9" height="3.5" fill="none" stroke="currentColor" stroke-width="1.3"/></svg>Advanced</button></span>
     <details class="dd guideDD"><summary class="chip hbtn" title="A walk round the tool, or a worked example done step by step in it">Guide</summary><div class="ddmenu">
       <button type="button" class="minibtn" data-guide="tour" title="What each part of the page is for, and how its drawings are worked">How to use the tool</button>
       <button type="button" class="minibtn" data-guide="example" title="An overhang sized for one moment by hand-method steps, then checked over the day and against the climate - the page set up for each step">Worked example: size an overhang</button>
@@ -12809,7 +12814,10 @@ entering            q \xD7 sunlit glass area \xD7 SHGC   W</div>
     document.body.classList.toggle("simple", simple);
     V.simple = simple;
     if (simple) S.scope = "unit";
-    document.querySelectorAll(".modeseg [data-mode]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.mode === S.mode)));
+    document.querySelectorAll(".modeseg [data-mode]").forEach((b) => {
+      b.setAttribute("aria-pressed", String(b.dataset.mode === S.mode));
+      b.setAttribute("aria-checked", String(b.dataset.mode === S.mode));
+    });
     try {
       localStorage.setItem(MODE_KEY, S.mode);
     } catch (_) {
