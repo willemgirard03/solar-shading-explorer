@@ -60,6 +60,8 @@ const $ = id => document.getElementById(id);
 const clampN = (x, a, b) => Math.min(b, Math.max(a, x));
 // the page starts on the default template - a 10 m square storey, a window in the middle of each side - on solar time, in the mode last used: Simple at first
 S.storeys[0].w = 10; S.storeys[0].d = 10;
+// the Vancouver by-law - site boundary and streets, how far devices may project, the code checks - is off until Advanced turns it on
+S.bylaw = false;
 windowEachSide(S);
 const MODE_KEY = 'solar-shading-mode-v9';
 try { S.mode = localStorage.getItem(MODE_KEY) === 'advanced' ? 'advanced' : 'simple'; } catch (_) { S.mode = 'simple'; }
@@ -653,6 +655,7 @@ document.addEventListener('click', e => {
 });
 function render(light = false) {
   liveUpdate();
+  showBylaw();
   // the cuts kept in the saved window that is the selection, however they were moved
   keepCuts(S);
   const F = buildFrame(S, V, light);
@@ -809,11 +812,24 @@ function loadDesign(o) { const x = JSON.parse(JSON.stringify(o)); for (const k o
 function applyMode() {
   const simple = S.mode === 'simple';
   document.body.classList.toggle('simple', simple);
+  showBylaw();
   V.simple = simple;
   if (simple) S.scope = 'unit';
   document.querySelectorAll('.modeseg [data-mode]').forEach(b => { b.setAttribute('aria-pressed', String(b.dataset.mode === S.mode)); b.setAttribute('aria-checked', String(b.dataset.mode === S.mode)); });
   try { localStorage.setItem(MODE_KEY, S.mode); } catch (_) { }
 }
+/** the by-law's parts of the page shown or not, and its switch set to match */
+function showBylaw() {
+  const on = S.mode !== 'simple' && S.bylaw !== false;
+  document.body.classList.toggle('bylaw', on);
+  const c = $('c_bylaw'); if (c) c.checked = S.bylaw !== false;
+}
+document.addEventListener('change', e => {
+  if (e.target.id !== 'c_bylaw') return;
+  stopPlay(); H.mark('bylaw'); S.bylaw = e.target.checked;
+  if (!S.bylaw) closeWidget(SITEW), V.siteEdit = false;
+  showBylaw(); clearSunCache(); schedule();
+});
 let modeTo = null;
 function enterMode(m, how) {
   stopPlay(); H.mark('mode');
@@ -821,24 +837,23 @@ function enterMode(m, how) {
   closeWidget(SW); closeWidget(SITEW); V.siteEdit = false; S.pick = null; picked = null; hideWidget(POP); V.plate.on = false;
   stash[S.mode] = cloneS();
   if (how === 'stash' && stash[m]) loadDesign(stash[m]);
+  // Simple's own model: the one it was left with, or the default block
+  else if (how === 'simple') { if (stash.simple) loadDesign(stash.simple); else { applyTypology('blank'); S.matchAbove.sides = false; } }
   else if (how === 'default') { applyTypology('blank'); S.matchAbove.sides = false; }
   S.mode = m; applyMode(); recentre(); afterRestore();
 }
 function askMode(m, btn) {
   if (m === S.mode) return;
-  const r = btn.getBoundingClientRect(), other = stash[m];
+  const r = btn.getBoundingClientRect();
   modeTo = m;
-  if (m === 'advanced') {
-    if (!other) { enterMode(m, 'continue'); return; }
-    openPop(r.left, r.bottom, '<p>Advanced mode</p><button type="button" data-modego="continue">Continue with the simple model</button><button type="button" data-modego="stash">Return to the advanced model</button><button type="button" data-modego="">Cancel</button>');
-    return;
-  }
-  const fits = fitsSimple(S);
-  if (fits && !other) { enterMode(m, 'continue'); return; }
-  openPop(r.left, r.bottom, '<p>Simple mode</p>' + (fits ? '' : '<span class="popnote">Simple shows one storey with one window on each side. This design is kept, to come back to in Advanced.</span>')
-    + (fits ? '<button type="button" data-modego="continue">Continue with this model</button>' : '')
-    + (other ? '<button type="button" data-modego="stash">Return to the simple model</button>' : '')
-    + '<button type="button" data-modego="default">Start from the default block</button><button type="button" data-modego="">Cancel</button>');
+  /* Simple to Advanced carries the design across as it is. Advanced to Simple
+     does too while the design has nothing only Advanced shows - more storeys,
+     more windows to a side, windows broken from their arrays; with any of
+     those it is kept for Advanced, and Simple goes back to its own model.
+     Escape or a click elsewhere stays where it is. */
+  if (m === 'advanced' || fitsSimple(S)) { enterMode(m, 'continue'); return; }
+  openPop(r.left, r.bottom, '<p>Simple mode</p><span class="popnote">Simple shows one storey with one window on each side. This design is kept, to come back to in Advanced.</span>'
+    + '<button type="button" data-modego="simple">Return to the simple model</button>');
 }
 document.addEventListener('click', e => {
   const b = e.target.closest && e.target.closest('[data-mode]');

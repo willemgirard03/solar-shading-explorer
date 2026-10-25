@@ -1017,7 +1017,7 @@ export function drawAxon(F) {
       const D = F.selD, isH = D.dir === 'h', us = mine.map(b => b.c[0]), vs = mine.map(b => b.c[1]);
       const uM = (Math.min(...us) + Math.max(...us)) / 2, vM = (Math.min(...vs) + Math.max(...vs)) / 2;
       const PV = ([a, w]) => pr([uM, a, w]), PU = ([a, w]) => pr([a, vM, w]);
-      const one = deviceEdit({ P: isH ? PV : PU, ax: isH ? 'V' : 'U', drop: isH ? 0 : 1, noGum: true }, D, mine, m, grips);
+      const one = deviceEdit({ P: isH ? PV : PU, ax: isH ? 'V' : 'U', drop: isH ? 0 : 1, noGum: true, plane: true }, D, mine, m, grips);
       {
         const O = [one.pop.x, one.pop.y], offs = D.offOn ? D : { offU: 0, offV: 0 };
         for (const [key, from, dir, col] of [['d.offU', offs.offU || 0, dU, '#c2412d'], ['d.offset', D.offset, dW, '#2f8a4e'], ['d.offV', offs.offV || 0, dV, '#2f6fd1']]) {

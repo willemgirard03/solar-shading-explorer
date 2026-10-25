@@ -77,6 +77,9 @@ body.simple .adv, body.simple .laygrp[data-grp="site"], body:not(.simple) .simpl
 .vbtns .vb[data-vfull], #dockFull{display:inline-flex; align-items:center; justify-content:center}
 .minibtn.iconbtn{display:inline-flex; align-items:center; justify-content:center; padding:3px 6px; line-height:0}
 /* the mode: one switch, a track with its name, the mode in use lifted out of it */
+/* the by-law's parts of the page, only while it is on */
+body:not(.bylaw) .law, body:not(.bylaw) .laygrp[data-grp="site"]{display:none !important}
+.bylawchk{display:inline-flex; align-items:center; gap:4px; font-size:12.5px}
 .masthead .modeseg{display:inline-flex; align-items:center; align-self:center; gap:2px; padding:3px; border:1px solid var(--rule); border-radius:999px; background:var(--paper)}
 .modeseg .modelab{font:600 10px var(--sans); letter-spacing:.09em; text-transform:uppercase; color:var(--ink3); padding:0 6px 0 9px}
 .modeseg button{display:inline-flex; align-items:center; gap:6px; margin:0; border:0; border-radius:999px; background:transparent; padding:5px 12px; font:500 12.5px var(--sans); color:var(--ink2); cursor:pointer; transition:background .15s, color .15s}
@@ -750,7 +753,7 @@ label.tipped{display:inline}
     <div class="droptarget" id="dropTarget" hidden></div>
 
     <!-- the code checks, for the whole building, under the drawings -->
-    <section class="results checksec adv" id="checksSec">
+    <section class="results checksec adv law" id="checksSec">
       <div class="resgrp"><h3>Code checks</h3><div class="calc"><div class="rules" id="checks"></div></div></div>
     </section>
 
@@ -766,7 +769,7 @@ label.tipped{display:inline}
     <!-- for the selected window's face, at this instant: where to start -->
     <section class="results recs" id="recs">
       <div class="resgrp"><h3>Ideal shading at this instant</h3><div class="calc" id="rec2"></div></div>
-      <div class="resgrp adv"><h3><span class="tipped" title="VBBL 1.8.9: how far a solar shading device may project past the property line into a street, by its height above the street and the street's width - read against the site boundary under Site Parameters">By-law: projection past the property line</span></h3><div class="calc" id="rec3"></div></div>
+      <div class="resgrp adv law"><h3><span class="tipped" title="VBBL 1.8.9: how far a solar shading device may project past the property line into a street, by its height above the street and the street's width - read against the site boundary under Site Parameters">By-law: projection past the property line</span></h3><div class="calc" id="rec3"></div></div>
     </section>
       </div>
     </section>
@@ -776,7 +779,7 @@ label.tipped{display:inline}
       <section id="secEnergy">
         <h2>Climate context</h2>
         <div id="energyIntro"></div>
-        <div class="rules adv" id="energyRules"></div>
+        <div class="rules adv law" id="energyRules"></div>
       </section>
       <section id="secMethod">
         <h2>Assumptions and methodology</h2>
@@ -5856,7 +5859,7 @@ label.tipped{display:inline}
     const cur = solarAt(S2.doy, S2.hour, S2.timeMode, sel.fac.gf);
     const res = m.opening ? shadeFraction(m, cur.sl, light ? 41 : 61, light ? 33 : 49) : null;
     cur.frac = res ? res.frac : 1;
-    const checks = S2.mode === "simple" ? null : siteChecks(S2, B);
+    const checks = S2.mode === "simple" || S2.bylaw === false ? null : siteChecks(S2, B);
     const selD = m.opening && S2.pick === "device" ? selDevice(S2) : null;
     const L2 = S2.live, gh = L2 && L2.ghost && L2.f === sel.f && L2.st === sel.st && m.opening ? L2.ghost : null;
     const ghost = gh ? Object.assign({}, gh, { boxes: gh.devs.flatMap((D) => buildDevice(D, m.g)) }) : null;
@@ -6424,11 +6427,43 @@ label.tipped{display:inline}
       const reach = Math.hypot(Tq[0] - H3[0], Tq[1] - H3[1]), R2 = Math.max(reach, 14) + 16;
       s += CIRCLE(H3[0], H3[1], 3, { fill: "var(--panel)", stroke: COL, "stroke-width": 1.2 });
       const half = Math.min(0.32, 12 / R2);
-      s += turnArc(H3[0], H3[1], R2, phi - half, phi + half);
-      for (const da of [0, -0.8 * half, 0.8 * half]) grips.push({ p: [H3[0] + R2 * Math.cos(phi + da), H3[1] + R2 * Math.sin(phi + da)], rot: true, pivot: H3, key: "d.angle", from: D.angle, sgn });
+      if (v.plane) {
+        const dirAt = (ang) => D.dir === "h" ? [-Math.sin(ang), Math.cos(ang)] : [Math.sin(ang), Math.cos(ang)];
+        const rl = R2 / (Math.hypot(s0[0], s0[1]) || 1), at = (ang) => {
+          const d2 = dirAt(ang);
+          return P([hinge[0] + rl * d2[0], hinge[1] + rl * d2[1]]);
+        };
+        const pts2 = [];
+        for (let i = 0; i <= 12; i++) pts2.push(at(r0 - half + 2 * half * i / 12));
+        let d = "";
+        pts2.forEach((p, i) => {
+          d += (i ? "L" : "M") + fmt(p[0], 2) + "," + fmt(p[1], 2);
+        });
+        let arr = PATH(d, { stroke: COL, w: 1.2, fill: "none" });
+        for (const [a, b] of [[pts2[1], pts2[0]], [pts2[pts2.length - 2], pts2[pts2.length - 1]]]) {
+          const tx = b[0] - a[0], ty = b[1] - a[1], l = Math.hypot(tx, ty) || 1, ux = tx / l, uy = ty / l;
+          arr += POLY([[b[0] + ux * 5, b[1] + uy * 5], [b[0] - uy * 3, b[1] + ux * 3], [b[0] + uy * 3, b[1] - ux * 3]], { fill: COL, stroke: COL, w: 0.4 });
+        }
+        s += `<g opacity=".7">${arr}</g>`;
+        const plane = { H: H3, A: dA, W: dW, h: D.dir === "h" };
+        for (const da of [0, -0.8 * half, 0.8 * half]) grips.push({ p: at(r0 + da), rot: true, pivot: H3, plane, key: "d.angle", from: D.angle, sgn });
+      } else {
+        s += turnArc(H3[0], H3[1], R2, phi - half, phi + half);
+        for (const da of [0, -0.8 * half, 0.8 * half]) grips.push({ p: [H3[0] + R2 * Math.cos(phi + da), H3[1] + R2 * Math.sin(phi + da)], rot: true, pivot: H3, key: "d.angle", from: D.angle, sgn });
+      }
       const r = Math.max(20, Math.min(reach * 0.7, 56)), d0 = phi0, d1 = phi0 + wrapPi(phi - phi0), mid = (d0 + d1) / 2;
       s += L(H3[0], H3[1], H3[0] + (r + 10) * Math.cos(phi0), H3[1] + (r + 10) * Math.sin(phi0), { stroke: "var(--ink3)", w: 0.6, dash: "3 2" });
-      if (Math.abs(D.angle) > 0.5) s += arc(H3[0], H3[1], r, -d0, -d1, "var(--ink3)");
+      if (Math.abs(D.angle) > 0.5) {
+        if (v.plane) {
+          const dirAt = (ang) => D.dir === "h" ? [-Math.sin(ang), Math.cos(ang)] : [Math.sin(ang), Math.cos(ang)], rl = r / (Math.hypot(sZ[0], sZ[1]) || 1);
+          let d = "";
+          for (let i = 0; i <= 16; i++) {
+            const q = dirAt(r0 * i / 16), p = P([hinge[0] + rl * q[0], hinge[1] + rl * q[1]]);
+            d += (i ? "L" : "M") + fmt(p[0], 2) + "," + fmt(p[1], 2);
+          }
+          s += PATH(d, { stroke: "var(--ink3)", w: 1, fill: "none" });
+        } else s += arc(H3[0], H3[1], r, -d0, -d1, "var(--ink3)");
+      }
       const su = [Math.cos(phi), Math.sin(phi)], side = su[0] >= 0 ? 1 : -1, nrm = [-su[1] * side, su[0] * side], lr = r + 10;
       const lift = Math.abs(D.angle) > 12 ? 0 : 12;
       s += TB(H3[0] + lr * Math.cos(mid) - nrm[0] * lift, H3[1] + lr * Math.sin(mid) - nrm[1] * lift + 3, fmt(D.angle, 0) + "\xB0", { size: 8.5, fill: COL, anchor: "middle", edit: "d.angle" });
@@ -8141,7 +8176,7 @@ label.tipped{display:inline}
         const D = F.selD, isH = D.dir === "h", us = mine.map((b) => b.c[0]), vs = mine.map((b) => b.c[1]);
         const uM = (Math.min(...us) + Math.max(...us)) / 2, vM = (Math.min(...vs) + Math.max(...vs)) / 2;
         const PV = ([a, w]) => pr([uM, a, w]), PU = ([a, w]) => pr([a, vM, w]);
-        const one = deviceEdit({ P: isH ? PV : PU, ax: isH ? "V" : "U", drop: isH ? 0 : 1, noGum: true }, D, mine, m, grips);
+        const one = deviceEdit({ P: isH ? PV : PU, ax: isH ? "V" : "U", drop: isH ? 0 : 1, noGum: true, plane: true }, D, mine, m, grips);
         {
           const O = [one.pop.x, one.pop.y], offs = D.offOn ? D : { offU: 0, offV: 0 };
           for (const [key, from, dir, col] of [["d.offU", offs.offU || 0, dU, "#c2412d"], ["d.offset", D.offset, dW, "#2f8a4e"], ["d.offV", offs.offV || 0, dV, "#2f6fd1"]]) {
@@ -8447,6 +8482,12 @@ label.tipped{display:inline}
     if (!o.view3d) {
       return popHeadName("name.unit", o.unitName || g.name || "Window", min, "The window\u2019s name: click to type a new one") + popChk("g.fillW", !!g.fillW, "Full bay width", "The glass fills its bay, with no wall between it and the next window: a window wall or a curtain wall. Otherwise pull its jambs in the plan.") + popChk("g.fillH", !!g.fillH, "Full height", "The glass runs from its sill to the underside of the slab above. Otherwise drag its head in the section.") + shadingHTML(o, true) + popMore(o.more, breakHTML(o.brk));
     }
+    if (o.mode === "window" && o.axon && !o.iso) {
+      let s2 = popHead(o.title || "Window", min) + isoHTML(o) + popChk("g.arrOn", !!o.arr, "Array", "Repeat the window along the side. Its number or spacing is typed on its dotted bracket in the building view.");
+      if (o.arr) s2 += popGrp("Set out", "By spacing, the windows keep their pitch as the side changes length; by number, their count", popSeg("g.arrBy", [["spacing", "Spacing"], ["number", "Number"]], o.by));
+      s2 += popChk("matchSides", !!o.sides, "Apply to all sides", "The storey\u2019s other sides take this side\u2019s windows and shading, and follow every later change.");
+      return s2 + `<div class="dvrow">${popBtn("delGlazing", "", "Remove", "Take the windows off this side (Delete)", "quiet")}</div>`;
+    }
     if (o.mode === "window") {
       const chips = (o.devs || []).map((d) => `<span class="chip${d.i === o.cur ? " on" : ""}"><button type="button" class="pbtn chipname" data-pact="pickDev" data-v="${d.i}" title="Edit this device in the ${d.dir === "h" ? "section" : "plan"}">${esc2(d.name)}</button><button type="button" class="pbtn chipx" data-pact="delDev" data-v="${d.i}" title="Take this device off">\xD7</button></span>`).join("");
       return popHead(o.title || "Window", min) + isoHTML(o) + (o.live ? shadingHTML(o, true) : (o.devs || []).length ? nameRow("Shading group", "name.shd", o.grpName || "Shading group", { kind: "group", opts: o.grpOpts, cur: o.grpId }) : "") + (o.live ? "" : shadingHTML(o, true)) + `<div class="dvsec">${esc2(o.side || "This side")} \xB7 window group</div>` + nameRow("Name", "name.sys", o.sysName || "Window group", { kind: "window", opts: o.winOpts, cur: o.sysId }) + sideHTML(o) + popMore(o.more, breakHTML(o.brk));
@@ -8524,7 +8565,7 @@ label.tipped{display:inline}
       <label class="barsel angsel"><span class="tipped" title="Where the angle constructions - \u03B2, the solar azimuth, \u03B3, the surface azimuth and the profile angle \u03B8 - are drawn: on the ground at the foot of the selected facade, at the floor of the selected window's storey, with their pivot at the middle of the selected window, at its sill, or at the base of its cut-off - where the profile angle's ray past the shading's outer edge meets the glass, so \u03B8's triangle runs up to that edge.">Angles drawn</span>
         <select class="angAt">${opts({ ground: "On the ground", level: "At the window\u2019s floor", window: "About the window", sill: "At the window\u2019s sill", cut: "At the base of its cut-off" }, v.angAt)}</select></label></div></details>
       <select class="axTyp adv" title="Typology template: choosing one replaces the building - floorplate, storeys and every side's glazing - and keeps the date, time and orientation. None comes with shading except the balconies: that is yours to design." aria-label="Typology template">${Object.entries(TYPOLOGIES).map(([k, t]) => `<option value="${k}" title="${t.about.replace(/"/g, "&quot;")}">${t.label}</option>`).join("")}</select>
-      <details class="dd axSite adv"><summary title="The site boundary: streets, lanes and neighbours on each side">Site</summary><div class="ddmenu">
+      <details class="dd axSite adv law"><summary title="The site boundary: streets, lanes and neighbours on each side">Site</summary><div class="ddmenu">
         <button type="button" class="minibtn axBnd" title="Each side of the site boundary: a street, a lane, an adjoining property or open ground. Its lines are pushed and pulled in the view, and their figures typed there.">Site boundary\u2026</button>
         <label class="barsel">Preset <select class="axSitePre" title="A site to start from: streets, lanes and neighbours on its sides. The obstructions are kept."><option value="" hidden selected>Choose\u2026</option>${Object.entries(SITE_PRESETS).map(([k, p]) => `<option value="${k}" title="${p.about}">${p.label}</option>`).join("")}</select></label>
       </div></details>
@@ -8541,12 +8582,12 @@ label.tipped{display:inline}
       <label class="barchk" title="The sun's angles at the window: altitude \u03B2, \u03B3 from the facade's normal, and the profile angle \u03B8 - each typed over to move the sun"><input type="checkbox" class="vAng"${v.detAng ? " checked" : ""}> Angles</label>
       <button type="button" class="minibtn detCentre">Centre the cuts</button><button type="button" class="minibtn liveon" title="Live shading: the selected window carries the ideal shading for the date and time set - remade as they change, and as you play through the day - in place of its own. Choose horizontal, vertical, both, or a louvred canopy, and how many members, from the bar it opens.">Live shading</button>`;
       case "section":
-        return `<label class="barchk adv" title="The property line, the curb and the furthest the by-law lets a shading device reach past the line, standing up from the site - the line and the curb dragged"><input type="checkbox" class="vSite"${v.site ? " checked" : ""}> Site constraints</label><label class="barchk" title="Shade the sunlight that gets in, and outline it; the whole window\u2019s beam stays dotted in grey either way"><input type="checkbox" class="vBeam"${v.beam !== false ? " checked" : ""}> Show sun beam</label><button type="button" class="minibtn liveon" title="Live shading: the selected window carries the ideal shading for the date and time set - remade as they change, and as you play through the day - in place of its own. Choose horizontal, vertical, both, or a louvred canopy, and how many members, from the bar it opens.">Live shading</button><button type="button" class="minibtn iconbtn secReset" title="Re-center view" aria-label="Re-center view"><svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true"><path d="M2.5 6V2.5H6M10 2.5h3.5V6M13.5 10v3.5H10M6 13.5H2.5V10" fill="none" stroke="currentColor" stroke-width="1.4"/><circle cx="8" cy="8" r="1.6" fill="currentColor"/></svg></button>` + SAVE;
+        return `<label class="barchk adv law" title="The property line, the curb and the furthest the by-law lets a shading device reach past the line, standing up from the site - the line and the curb dragged"><input type="checkbox" class="vSite"${v.site ? " checked" : ""}> Site constraints</label><label class="barchk" title="Shade the sunlight that gets in, and outline it; the whole window\u2019s beam stays dotted in grey either way"><input type="checkbox" class="vBeam"${v.beam !== false ? " checked" : ""}> Show sun beam</label><button type="button" class="minibtn liveon" title="Live shading: the selected window carries the ideal shading for the date and time set - remade as they change, and as you play through the day - in place of its own. Choose horizontal, vertical, both, or a louvred canopy, and how many members, from the bar it opens.">Live shading</button><button type="button" class="minibtn iconbtn secReset" title="Re-center view" aria-label="Re-center view"><svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true"><path d="M2.5 6V2.5H6M10 2.5h3.5V6M13.5 10v3.5H10M6 13.5H2.5V10" fill="none" stroke="currentColor" stroke-width="1.4"/><circle cx="8" cy="8" r="1.6" fill="currentColor"/></svg></button>` + SAVE;
       case "plan":
         return `<details class="dd beamDD"><summary title="What the floor shows of the sun that gets in - at this instant, over the day or over the year - and whether the beam is shaded">Beam settings</summary><div class="ddmenu">
         <div class="seg mini inModes vstack">${Object.entries(INTERIOR_MODES).map(([k, l]) => `<button type="button" data-mode="${k}">${l}</button>`).join("")}</div>
         <label class="barchk" title="Shade the sunlight that gets in, and outline it; the whole window\u2019s beam stays dotted in grey either way"><input type="checkbox" class="vBeam"${v.beam !== false ? " checked" : ""}> Show sun beam</label></div></details>
-      <label class="barchk" title="Off: the selected window's bay alone, its sun landing on a floor left unseen. On: the whole storey round it."><input type="checkbox" class="vWhole"${v.whole ? " checked" : ""}> Whole floor</label><label class="barchk adv" title="The property line, the curb and the furthest the by-law lets a shading device reach past the line, standing up from the site - the line and the curb dragged"><input type="checkbox" class="vSite"${v.site ? " checked" : ""}> Site constraints</label><button type="button" class="minibtn liveon" title="Live shading: the selected window carries the ideal shading for the date and time set - remade as they change, and as you play through the day - in place of its own. Choose horizontal, vertical, both, or a louvred canopy, and how many members, from the bar it opens.">Live shading</button><button type="button" class="minibtn iconbtn planReset" title="Re-center view" aria-label="Re-center view"><svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true"><path d="M2.5 6V2.5H6M10 2.5h3.5V6M13.5 10v3.5H10M6 13.5H2.5V10" fill="none" stroke="currentColor" stroke-width="1.4"/><circle cx="8" cy="8" r="1.6" fill="currentColor"/></svg></button>` + SAVE;
+      <label class="barchk" title="Off: the selected window's bay alone, its sun landing on a floor left unseen. On: the whole storey round it."><input type="checkbox" class="vWhole"${v.whole ? " checked" : ""}> Whole floor</label><label class="barchk adv law" title="The property line, the curb and the furthest the by-law lets a shading device reach past the line, standing up from the site - the line and the curb dragged"><input type="checkbox" class="vSite"${v.site ? " checked" : ""}> Site constraints</label><button type="button" class="minibtn liveon" title="Live shading: the selected window carries the ideal shading for the date and time set - remade as they change, and as you play through the day - in place of its own. Choose horizontal, vertical, both, or a louvred canopy, and how many members, from the bar it opens.">Live shading</button><button type="button" class="minibtn iconbtn planReset" title="Re-center view" aria-label="Re-center view"><svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true"><path d="M2.5 6V2.5H6M10 2.5h3.5V6M13.5 10v3.5H10M6 13.5H2.5V10" fill="none" stroke="currentColor" stroke-width="1.4"/><circle cx="8" cy="8" r="1.6" fill="currentColor"/></svg></button>` + SAVE;
     }
     return "";
   }
@@ -9519,6 +9560,7 @@ label.tipped{display:inline}
   <span class="cbtitle">Calculation settings</span>
   <label class="barsel"><span class="tipped" title="An hour-by-hour typical year for Vancouver, shifted for warming. It colours the sun chart's dots by temperature and gives the beam for the average and recorded days and every yearly total; a clear day does not depend on it.">Weather file</span> <select data-k="wx" id="c_wx">${Object.entries(WEATHER_FILES).map(([k, l]) => `<option value="${k}">${l}</option>`).join("")}<option value="__epw" title="An EnergyPlus weather file of your own - such as a future-shifted file from the Pacific Climate Impacts Consortium. Its hours are read as Pacific Standard Time, the sun as Vancouver's.">Load an .epw file\u2026</option></select><input type="file" id="epwFile" accept=".epw" hidden></label>
   <label class="barsel adv"><span class="tipped" title="Which windows the plan's floor, the 3D view's light, the sun chart's shading, the solar heat gain and its charts are for.">Results for</span> <select data-k="scope" id="c_scope">${Object.entries(SCOPES).map(([k, l]) => `<option value="${k}">${l}</option>`).join("")}</select></label>
+  <label class="chk adv bylawchk"><input type="checkbox" id="c_bylaw"><span class="tipped" title="The Vancouver by-law: the site boundary and its streets, how far a shading device may project past the property line, glass SHGC and window-to-wall checks, and the energy rules. Off, none of it is shown or checked.">By-law</span></label>
   <label class="barsel">Sky ${seg2("sky", [["clear", "Clear day"], ["average", "Average day"], ["recorded", "Recorded day"]], "mini")}</label>
   <div class="tset">
     <span class="barslide"><span class="scrub" data-scrub="doy" title="Drag left or right to change the date">Date</span><input type="range" id="c_doy" data-k="doy" min="1" max="365" step="1" aria-label="Date"><span class="val" data-val="doy" tabindex="0" title="Click to type a date, e.g. Jun 21 or 6/21"></span></span>
@@ -10411,6 +10453,12 @@ entering            q \xD7 sunlit glass area \xD7 SHGC   W</div>
     }
     return out;
   }
+  function planeAngle(pl, v) {
+    const dx = v[0] - pl.H[0], dy = v[1] - pl.H[1], det = pl.A[0] * pl.W[1] - pl.W[0] * pl.A[1];
+    if (Math.abs(det) < 1e-9) return Math.atan2(dy, dx);
+    const la = (dx * pl.W[1] - pl.W[0] * dy) / det, lw = (pl.A[0] * dy - dx * pl.A[1]) / det;
+    return pl.h ? Math.atan2(-la, lw) : Math.atan2(la, lw);
+  }
   var snapAngle = (a, snaps) => {
     const n = (snaps || []).find((x) => Math.abs(x - a) < 2);
     return n === void 0 ? null : n;
@@ -11224,7 +11272,7 @@ entering            q \xD7 sunlit glass area \xD7 SHGC   W</div>
             iso: gp,
             v0: v,
             travel: 0,
-            t0: gp.rot ? Math.atan2(v[1] - gp.pivot[1], v[0] - gp.pivot[0]) : 0,
+            t0: gp.rot ? gp.plane ? planeAngle(gp.plane, v) : Math.atan2(v[1] - gp.pivot[1], v[0] - gp.pivot[0]) : 0,
             snap: gp.key === "d.depth" ? depthSnapOf(S2) : null,
             angs: gp.rot ? angleSnapsOf(S2) : null
           };
@@ -11359,8 +11407,8 @@ entering            q \xD7 sunlit glass area \xD7 SHGC   W</div>
         ad.travel = Math.max(ad.travel, Math.hypot(v[0] - ad.v0[0], v[1] - ad.v0[1]));
         if ((g.arrow || g.rot) && ad.travel < 3) return;
         if (g.rot) {
-          const t = Math.atan2(v[1] - g.pivot[1], v[0] - g.pivot[0]), d = ((t - ad.t0) * 180 / Math.PI + 540) % 360 - 180;
-          const a = g.from + g.sgn * d, sn = snapAngle(a, ad.angs);
+          const t = g.plane ? planeAngle(g.plane, v) : Math.atan2(v[1] - g.pivot[1], v[0] - g.pivot[0]), d = ((t - ad.t0) * 180 / Math.PI + 540) % 360 - 180;
+          const a = g.from + (g.plane ? 1 : g.sgn) * d, sn = snapAngle(a, ad.angs);
           if (sn !== null) ax.dataset.snap = SNAP_NOTE;
           else delete ax.dataset.snap;
           setValue("d.angle", clamp(sn !== null ? sn : Math.round(a), -85, 85), S2);
@@ -11770,6 +11818,7 @@ entering            q \xD7 sunlit glass area \xD7 SHGC   W</div>
   var clampN3 = (x, a, b) => Math.min(b, Math.max(a, x));
   S.storeys[0].w = 10;
   S.storeys[0].d = 10;
+  S.bylaw = false;
   windowEachSide(S);
   var MODE_KEY = "solar-shading-mode-v9";
   try {
@@ -12622,6 +12671,7 @@ entering            q \xD7 sunlit glass area \xD7 SHGC   W</div>
   });
   function render(light = false) {
     liveUpdate();
+    showBylaw();
     keepCuts(S);
     const F = buildFrame(S, V, light);
     const { m, cur, res, sel, T: T3 } = F, md = F.date;
@@ -12812,6 +12862,7 @@ entering            q \xD7 sunlit glass area \xD7 SHGC   W</div>
   function applyMode() {
     const simple = S.mode === "simple";
     document.body.classList.toggle("simple", simple);
+    showBylaw();
     V.simple = simple;
     if (simple) S.scope = "unit";
     document.querySelectorAll(".modeseg [data-mode]").forEach((b) => {
@@ -12823,6 +12874,22 @@ entering            q \xD7 sunlit glass area \xD7 SHGC   W</div>
     } catch (_) {
     }
   }
+  function showBylaw() {
+    const on = S.mode !== "simple" && S.bylaw !== false;
+    document.body.classList.toggle("bylaw", on);
+    const c = $2("c_bylaw");
+    if (c) c.checked = S.bylaw !== false;
+  }
+  document.addEventListener("change", (e) => {
+    if (e.target.id !== "c_bylaw") return;
+    stopPlay();
+    H2.mark("bylaw");
+    S.bylaw = e.target.checked;
+    if (!S.bylaw) closeWidget(SITEW), V.siteEdit = false;
+    showBylaw();
+    clearSunCache();
+    schedule();
+  });
   var modeTo = null;
   function enterMode(m, how) {
     stopPlay();
@@ -12837,7 +12904,13 @@ entering            q \xD7 sunlit glass area \xD7 SHGC   W</div>
     V.plate.on = false;
     stash[S.mode] = cloneS();
     if (how === "stash" && stash[m]) loadDesign(stash[m]);
-    else if (how === "default") {
+    else if (how === "simple") {
+      if (stash.simple) loadDesign(stash.simple);
+      else {
+        applyTypology("blank");
+        S.matchAbove.sides = false;
+      }
+    } else if (how === "default") {
       applyTypology("blank");
       S.matchAbove.sides = false;
     }
@@ -12848,22 +12921,13 @@ entering            q \xD7 sunlit glass area \xD7 SHGC   W</div>
   }
   function askMode(m, btn2) {
     if (m === S.mode) return;
-    const r = btn2.getBoundingClientRect(), other = stash[m];
+    const r = btn2.getBoundingClientRect();
     modeTo = m;
-    if (m === "advanced") {
-      if (!other) {
-        enterMode(m, "continue");
-        return;
-      }
-      openPop(r.left, r.bottom, '<p>Advanced mode</p><button type="button" data-modego="continue">Continue with the simple model</button><button type="button" data-modego="stash">Return to the advanced model</button><button type="button" data-modego="">Cancel</button>');
-      return;
-    }
-    const fits = fitsSimple(S);
-    if (fits && !other) {
+    if (m === "advanced" || fitsSimple(S)) {
       enterMode(m, "continue");
       return;
     }
-    openPop(r.left, r.bottom, "<p>Simple mode</p>" + (fits ? "" : '<span class="popnote">Simple shows one storey with one window on each side. This design is kept, to come back to in Advanced.</span>') + (fits ? '<button type="button" data-modego="continue">Continue with this model</button>' : "") + (other ? '<button type="button" data-modego="stash">Return to the simple model</button>' : "") + '<button type="button" data-modego="default">Start from the default block</button><button type="button" data-modego="">Cancel</button>');
+    openPop(r.left, r.bottom, '<p>Simple mode</p><span class="popnote">Simple shows one storey with one window on each side. This design is kept, to come back to in Advanced.</span><button type="button" data-modego="simple">Return to the simple model</button>');
   }
   document.addEventListener("click", (e) => {
     const b = e.target.closest && e.target.closest("[data-mode]");

@@ -25,7 +25,8 @@ export function buildFrame(S, V, light = false) {
   cur.frac = res ? res.frac : 1;
   // every device on the building, read against the site boundary and the by-law
   // Simple mode has no site boundary to read devices against
-  const checks = S.mode === 'simple' ? null : siteChecks(S, B);
+  // nor while the by-law is off, as it is to begin with: a design made elsewhere, with no say, is read against it
+  const checks = S.mode === 'simple' || S.bylaw === false ? null : siteChecks(S, B);
   // what the plan's and the section's grips edit: the selected window's unit type and its selected device - each a type, shared
   // what is picked on a plan or a section - the window and its wall, or a device - is what shows its handles
   const selD = m.opening && S.pick === 'device' ? selDevice(S) : null;

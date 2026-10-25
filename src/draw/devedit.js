@@ -131,12 +131,38 @@ export function deviceEdit(v, D, mine, m, grips) {
     // the turning arc, beyond the tip, about the hinge - marked where it is
     s += CIRCLE(H[0], H[1], 3, { fill: 'var(--panel)', stroke: COL, 'stroke-width': 1.2 });
     const half = Math.min(0.32, 12 / R);
-    s += turnArc(H[0], H[1], R, phi - half, phi + half);
-    for (const da of [0, -0.8 * half, 0.8 * half]) grips.push({ p: [H[0] + R * Math.cos(phi + da), H[1] + R * Math.sin(phi + da)], rot: true, pivot: H, key: 'd.angle', from: D.angle, sgn });
+    if (v.plane) {
+      /* in the building view the arc lies in the plane the member turns in,
+         foreshortened with it: its points the member's direction at angles
+         about its own, a radius out from the hinge, and its grips read the
+         angle back in that plane */
+      const dirAt = ang => D.dir === 'h' ? [-Math.sin(ang), Math.cos(ang)] : [Math.sin(ang), Math.cos(ang)];
+      const rl = R / (Math.hypot(s0[0], s0[1]) || 1), at = ang => { const d = dirAt(ang); return P([hinge[0] + rl * d[0], hinge[1] + rl * d[1]]); };
+      const pts = []; for (let i = 0; i <= 12; i++) pts.push(at(r0 - half + 2 * half * i / 12));
+      let d = ''; pts.forEach((p, i) => { d += (i ? 'L' : 'M') + fmt(p[0], 2) + ',' + fmt(p[1], 2); });
+      let arr = PATH(d, { stroke: COL, w: 1.2, fill: 'none' });
+      for (const [a, b] of [[pts[1], pts[0]], [pts[pts.length - 2], pts[pts.length - 1]]]) {
+        const tx = b[0] - a[0], ty = b[1] - a[1], l = Math.hypot(tx, ty) || 1, ux = tx / l, uy = ty / l;
+        arr += POLY([[b[0] + ux * 5, b[1] + uy * 5], [b[0] - uy * 3, b[1] + ux * 3], [b[0] + uy * 3, b[1] - ux * 3]], { fill: COL, stroke: COL, w: .4 });
+      }
+      s += `<g opacity=".7">${arr}</g>`;
+      const plane = { H, A: dA, W: dW, h: D.dir === 'h' };
+      for (const da of [0, -0.8 * half, 0.8 * half]) grips.push({ p: at(r0 + da), rot: true, pivot: H, plane, key: 'd.angle', from: D.angle, sgn });
+    } else {
+      s += turnArc(H[0], H[1], R, phi - half, phi + half);
+      for (const da of [0, -0.8 * half, 0.8 * half]) grips.push({ p: [H[0] + R * Math.cos(phi + da), H[1] + R * Math.sin(phi + da)], rot: true, pivot: H, key: 'd.angle', from: D.angle, sgn });
+    }
     // the angle, dimensioned by an arc from the member laid flat, and typed over
     const r = Math.max(20, Math.min(reach * 0.7, 56)), d0 = phi0, d1 = phi0 + wrapPi(phi - phi0), mid = (d0 + d1) / 2;
     s += L(H[0], H[1], H[0] + (r + 10) * Math.cos(phi0), H[1] + (r + 10) * Math.sin(phi0), { stroke: 'var(--ink3)', w: .6, dash: '3 2' });
-    if (Math.abs(D.angle) > 0.5) s += arc(H[0], H[1], r, -d0, -d1, 'var(--ink3)');
+    if (Math.abs(D.angle) > 0.5) {
+      if (v.plane) {
+        // the angle's arc in the member's plane too, from the member laid flat round to it
+        const dirAt = ang => D.dir === 'h' ? [-Math.sin(ang), Math.cos(ang)] : [Math.sin(ang), Math.cos(ang)], rl = r / (Math.hypot(sZ[0], sZ[1]) || 1);
+        let d = ''; for (let i = 0; i <= 16; i++) { const q = dirAt(r0 * i / 16), p = P([hinge[0] + rl * q[0], hinge[1] + rl * q[1]]); d += (i ? 'L' : 'M') + fmt(p[0], 2) + ',' + fmt(p[1], 2); }
+        s += PATH(d, { stroke: 'var(--ink3)', w: 1, fill: 'none' });
+      } else s += arc(H[0], H[1], r, -d0, -d1, 'var(--ink3)');
+    }
     // the angle's figure on the arc, to the member's one side; its thickness to the other
     const su = [Math.cos(phi), Math.sin(phi)], side = su[0] >= 0 ? 1 : -1, nrm = [-su[1] * side, su[0] * side], lr = r + 10;
     const lift = Math.abs(D.angle) > 12 ? 0 : 12;

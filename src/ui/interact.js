@@ -147,6 +147,13 @@ function angleSnapsOf(S) {
   }
   return out;
 }
+/** the member's angle under the pointer, read in the plane it turns in: the screen point taken back through that plane's two axes on the sheet */
+function planeAngle(pl, v) {
+  const dx = v[0] - pl.H[0], dy = v[1] - pl.H[1], det = pl.A[0] * pl.W[1] - pl.W[0] * pl.A[1];
+  if (Math.abs(det) < 1e-9) return Math.atan2(dy, dx);
+  const la = (dx * pl.W[1] - pl.W[0] * dy) / det, lw = (pl.A[0] * dy - dx * pl.A[1]) / det;
+  return pl.h ? Math.atan2(-la, lw) : Math.atan2(la, lw);
+}
 /** a turn snapped to an angle at which the device's end falls on the sun's line, within two degrees */
 const snapAngle = (a, snaps) => { const n = (snaps || []).find(x => Math.abs(x - a) < 2); return n === undefined ? null : n; };
 const SNAP_NOTE = 'snapped: its end on the sun now';
@@ -775,7 +782,7 @@ export function wireView(inst, app) {
       if (gp) {
         app.stopPlay(); H.mark('grip:' + gp.key);
         if (e.altKey && (gp.arrow || gp.rot)) app.dupDevice();
-        ad = { iso: gp, v0: v, travel: 0, t0: gp.rot ? Math.atan2(v[1] - gp.pivot[1], v[0] - gp.pivot[0]) : 0,
+        ad = { iso: gp, v0: v, travel: 0, t0: gp.rot ? (gp.plane ? planeAngle(gp.plane, v) : Math.atan2(v[1] - gp.pivot[1], v[0] - gp.pivot[0])) : 0,
           snap: gp.key === 'd.depth' ? depthSnapOf(S) : null, angs: gp.rot ? angleSnapsOf(S) : null };
         try { ax.setPointerCapture(e.pointerId); } catch (_) { } ax.classList.add('drag'); e.preventDefault(); return;
       }
@@ -844,8 +851,9 @@ export function wireView(inst, app) {
       ad.travel = Math.max(ad.travel, Math.hypot(v[0] - ad.v0[0], v[1] - ad.v0[1]));
       if ((g.arrow || g.rot) && ad.travel < 3) return;
       if (g.rot) {
-        const t = Math.atan2(v[1] - g.pivot[1], v[0] - g.pivot[0]), d = ((t - ad.t0) * 180 / Math.PI + 540) % 360 - 180;
-        const a = g.from + g.sgn * d, sn = snapAngle(a, ad.angs);
+        // in the member's own plane the angle is read there, and needs no sense to be told; on the sheet, about the hinge on the screen
+        const t = g.plane ? planeAngle(g.plane, v) : Math.atan2(v[1] - g.pivot[1], v[0] - g.pivot[0]), d = ((t - ad.t0) * 180 / Math.PI + 540) % 360 - 180;
+        const a = g.from + (g.plane ? 1 : g.sgn) * d, sn = snapAngle(a, ad.angs);
         if (sn !== null) ax.dataset.snap = SNAP_NOTE; else delete ax.dataset.snap;
         setValue('d.angle', clamp(sn !== null ? sn : Math.round(a), -85, 85), S); app.scheduleLight(); return;
       }
