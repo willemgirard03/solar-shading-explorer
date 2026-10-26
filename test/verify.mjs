@@ -21,7 +21,7 @@ import { defaultState, applyCase, setValue, addWindow, CASES, TYPOLOGIES, applyT
   breakUnit, rebindUnit, rebindAll, selGlazing, arrayGlazing, isBroken, selDevice, selCell, duplicateHere, newSystemHere, newUnitHere, useSystem, removeGlazing,
   saveWindow, openWindow, selectionChanged, keepCuts, windowState, shadingFromIdeal, selSystem, addContextAt, removeContext, siteOf, duplicateContext,
   instanceContext, makeUnique, contextSnaps, pullContext, turnContext, putContext, plateTo,
-  addShading, saveEntry, copyEntry, copyName, addSavedWindow, selShading, applySitePreset, rotateSite, liveToggle, liveApply, liveOff, unlinkSides, fitsSimple, windowEachSide } from '../src/state.js';
+  addShading, saveEntry, copyEntry, copyName, addSavedWindow, selShading, applySitePreset, rotateSite, liveToggle, liveApply, liveOff, liveStart, unlinkSides, fitsSimple, windowEachSide } from '../src/state.js';
 import { parseEpw, addWeather, placeOf } from '../src/weather.js';
 import { setSite, SITE0 } from '../src/solar.js';
 import * as studiesMod from '../src/studies.js';
@@ -58,7 +58,7 @@ import { drawSunYear } from '../src/draw/sunyear.js';
 import { exportModel, writeRhino } from '../src/export/rhino.js';
 import { SHEETCAM0 } from '../src/draw/sheetcam.js';
 import { V as VIEW0 } from '../src/view.js';
-import { calcSun, calcProfile, calcInside, calcGain, recBylaw, recGlazing, projectionAt, recGeometry, recUI, hSolution, idealSpec } from '../src/ui/calc.js';
+import { calcSun, calcProfile, calcInside, calcGain, recBylaw, recGlazing, projectionAt, recGeometry, recUI, hSolution, idealSpec, chartSpec, eggCrate } from '../src/ui/calc.js';
 import { renderChecks } from '../src/ui/prose.js';
 import { clearDNI, typicalDNI, beamAt, unitGain, targetGain, dayGain, yearGain, hourlyStudy, floorNow, floorTotal, landing } from '../src/energy.js';
 import { roomOf, sunPatches, litGlass, reachRegion } from '../src/geometry/room.js';
@@ -818,6 +818,40 @@ section('6. The state');
     const named = selShading(t).name === 'Ideal horizontal - Jun 21, 16:00' && t.lib.devices[selShading(t).devices[0]].name === 'Ideal horizontal - Jun 21, 16:00';
     check('live optimization: turned off, it reverts to what the window carried, or keeps the last of it under a name; upright members step out from the facade', upright && back && named, [upright, back, named].join(' '));
     check('live optimization: the ideal goes on the window in place of its shading, is remade in place, and stays when turned off', a && b && c, [a, b, c].join(' '));
+  }
+  /* blades and fins trimmed where they meet - from the chart, and the egg-crate
+     for the instant: only length that shades nothing goes, so the glass is
+     shaded exactly as it was untrimmed, for sun from anywhere in front of it */
+  {
+    const t = defaultState(); addWindow(t); liveStart('chart', t);
+    const R = Math.PI / 180, tn = a => Math.tan(Math.min(a, 80) * R), m0 = buildFrame(t, null).m;
+    const litAll = specs => {
+      liveApply(specs, t);
+      const m = buildFrame(t, null).m, out = [];
+      for (let a = 3; a < 88; a += 6) for (let b = -84; b <= 84; b += 6) out.push(shadeFraction(m, [Math.cos(a * R) * Math.sin(b * R), Math.sin(a * R), Math.cos(a * R) * Math.cos(b * R)]).lit);
+      return out;
+    };
+    const untrim = (sp, gH, tV) => Object.fromEntries(Object.entries(sp).map(([k, s]) => [k, s && Object.assign({}, s, { shift: 0, ext: s.dir === 'h' ? Math.min(12, 2 * s.d * gH) : Math.min(12, s.d * tV) })]));
+    const extOf = sp => Object.values(sp).reduce((x, s) => x + (s ? s.ext : 0), 0);
+    const rows = [];
+    for (const [cut, n] of [[{ th: 40, l: 35, r: null }, 1], [{ th: 62, l: 30, r: 50 }, 1], [{ th: 50, l: null, r: 40 }, 3], [{ th: 70, l: 25, r: 25 }, 1]]) {
+      recUI.nh = n;
+      const sp = chartSpec(m0, cut), full = untrim(sp, tn(Math.max(cut.l ?? 60, cut.r ?? 60)), tn(cut.th));
+      const A = litAll(full), B = litAll(sp), diff = Math.max(...A.map((x, i) => Math.abs(x - B[i])));
+      rows.push({ diff, cut: extOf(full) - extOf(sp) });
+    }
+    recUI.nh = 1;
+    // the egg-crate for an afternoon in June, the sun round to the west
+    liveOff('revert', t); t.doy = 172; t.hour = 15.5; t.timeMode = 'sol'; liveToggle('h', t); liveToggle('v', t);
+    const F = buildFrame(t, null), sp = { h: idealSpec(F, 'h'), v: idealSpec(F, 'v') }, gam = wrap180(F.cur.gf - F.cur.az);
+    if (sp.h && sp.v) {
+      const full = untrim(sp, Math.tan(Math.abs(gam) * R), Math.tan(F.cur.vsa * R)), ec = eggCrate(sp, F);
+      const A = litAll(full), B = litAll(ec);
+      rows.push({ diff: Math.max(...A.map((x, i) => Math.abs(x - B[i]))), cut: extOf(full) - extOf(ec) });
+    } else rows.push({ diff: 1, cut: 0 });
+    liveOff('revert', t);
+    check('blades and fins trimmed where they meet, from the chart and as an egg-crate, shade the glass exactly as untrimmed, for sun from anywhere in front',
+      rows.every(r => r.diff < 0.002 && r.cut > 0.01), rows.map(r => 'Δ ' + fmt(r.diff * 100, 2) + '% cut ' + fmt(r.cut, 2) + ' m').join(', '));
   }
   // Simple mode: a design fits it with one storey and one window a side; Apply to all sides turned off leaves each side its own
   {

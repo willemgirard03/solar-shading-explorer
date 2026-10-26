@@ -3577,6 +3577,7 @@ label.tipped{display:inline}
       },
       h ? { justV: "start", justU: "centre" } : { justU: spec.side === "end" ? "end" : "start", justV: "end" }
     );
+    if (spec.shift && r4(spec.shift)) Object.assign(D, { offOn: true, offU: r4(spec.shift) });
     if (n > 1) D.arr = { along: "facade", mode: "count", count: n, spacing: r4(spec.pitch), len: r4((n - 1) * spec.pitch), ends: true };
     return D;
   }
@@ -8020,6 +8021,9 @@ label.tipped{display:inline}
         g += L(...band[0], ...band[1], same ? { stroke: "var(--rule)", w: 0.5 } : { stroke: "var(--ink)", w: 0.8 });
         hits.push({ f: key, st, unit: null, d: -1e9 + st, pts: band });
       }
+      const top = fo.pts.map((p) => P([p[0], p[1], fo.z1]));
+      g += POLY(top, { fill: "#F6F8F7", stroke: "var(--ink)", w: st === S2.storeys.length - 1 ? 1 : 0.7 });
+      hits.push({ f: S2.sel.f, st, unit: null, roof: true, d: -1e9 + st + 0.5, pts: top });
       const drawn = byStorey[st].sort((a, b) => depth(a) - depth(b));
       for (const u of drawn) g += paintFaces(
         order(u.back(), u.f, u.st, GLASS_GROUP),
@@ -8048,9 +8052,6 @@ label.tipped{display:inline}
           };
         } else if (u.broken) g += POLY(pts, { fill: "none", stroke: "var(--sun)", w: 1.2, dash: "3 2" });
       }
-      const top = fo.pts.map((p) => P([p[0], p[1], fo.z1]));
-      g += POLY(top, { fill: "#F6F8F7", stroke: "var(--ink)", w: st === S2.storeys.length - 1 ? 1 : 0.7 });
-      hits.push({ f: S2.sel.f, st, unit: null, roof: true, d: -1e9 + st + 0.5, pts: top });
     }
     if (seenSel) {
       const fr = sel.row.frame, r = sel.row;
@@ -9397,20 +9398,33 @@ label.tipped{display:inline}
     const n = recUI.nv, pitch = m.winW / n, d = pitch / tg;
     return { dir: "v", n, d, pitch, ext: Math.min(12, d * tT), side: gam > 0 ? "end" : "start", name: "Ideal solution - " + when };
   }
+  var runOn = (d, by, t) => Math.min(6, Math.round(Math.max(0, d - by) * t * 1e3) / 1e3);
+  var pastJambs = (sp, eS, eE) => Object.assign({}, sp, { ext: eS + eE, shift: (eE - eS) / 2 });
   function chartSpec(m, cut) {
-    const out = {}, tn = (a) => Math.tan(Math.min(a, 80) * D2R), FREE = 60;
+    const out = {}, tn = (a) => Math.tan(Math.min(a, 80) * D2R), FREE = 60, fin = {};
     if (!cut || !m.opening && !(m.winW > 0)) return out;
+    for (const k of ["l", "r"]) {
+      const d = cut[k] == null ? 0 : m.winW / Math.tan(cut[k] * D2R);
+      if (d > 0 && d <= IDEAL_MAX) fin[k] = d;
+    }
+    let dh = 0;
     if (cut.th != null) {
       const n = recUI.nh, pitch = m.winH / n, d = pitch / Math.tan(cut.th * D2R);
-      const g = Math.max(cut.l ?? FREE, cut.r ?? FREE);
-      if (d > 0 && d <= IDEAL_MAX) out.h = { dir: "h", n, d, pitch, ext: Math.min(12, 2 * d * tn(g)), name: n === 1 ? "Overhang" : "Horizontal louvres" };
+      const run = (k) => runOn(d, fin[k] || 0, tn(cut[k] ?? FREE));
+      if (d > 0 && d <= IDEAL_MAX) {
+        dh = d;
+        out.h = pastJambs({ dir: "h", n, d, pitch, name: n === 1 ? "Overhang" : "Horizontal louvres" }, run("r"), run("l"));
+      }
     }
-    for (const k of ["l", "r"]) {
-      if (cut[k] == null) continue;
-      const d = m.winW / Math.tan(cut[k] * D2R);
-      if (d > 0 && d <= IDEAL_MAX) out["v" + k] = { dir: "v", n: 1, d, pitch: m.winW, ext: Math.min(12, d * tn(cut.th ?? FREE)), side: k === "l" ? "end" : "start", name: "Fin" };
-    }
+    for (const k in fin) out["v" + k] = { dir: "v", n: 1, d: fin[k], pitch: m.winW, ext: Math.min(12, Math.round(Math.max(0, fin[k] - dh) * tn(cut.th ?? FREE) * 1e3) / 1e3), side: k === "l" ? "end" : "start", name: "Fin" };
     return out;
+  }
+  function eggCrate(sp, F) {
+    const { h, v } = sp;
+    if (!h || !v) return sp;
+    const gam = wrap180(F.cur.gf - F.cur.az), tg = Math.tan(Math.abs(gam) * D2R), tT = Math.tan(F.cur.vsa * D2R);
+    const far = runOn(h.d, 0, tg), near = runOn(h.d, v.d, tg), end = v.side === "end";
+    return Object.assign({}, sp, { h: pastJambs(h, end ? far : near, end ? near : far), v: Object.assign({}, v, { ext: Math.min(12, Math.round(Math.max(0, v.d - h.d) * tT * 1e3) / 1e3) }) });
   }
   var MEMBERS_TIP = "One member as deep as the window needs, or the same cut-off from n members, each 1/n as deep at 1/n the spacing. Try different numbers here: it does not change the design.";
   var noSolution = (why) => `<p class="calcnote nosol"><b>No solution</b> at this instant: ${why}</p>`;
@@ -12649,7 +12663,7 @@ entering            q \xD7 sunlit glass area \xD7 SHGC   W</div>
     const onFacade = sp.alt > 0 && Math.cos(wrap180(gf - sp.az) * Math.PI / 180) > 0;
     const cutToWindow = (sp2) => {
       if (L2.ext === false) {
-        for (const k2 in sp2) if (sp2[k2]) sp2[k2] = Object.assign({}, sp2[k2], { ext: 0 });
+        for (const k2 in sp2) if (sp2[k2]) sp2[k2] = Object.assign({}, sp2[k2], { ext: 0, shift: 0 });
       }
       return sp2;
     };
@@ -12668,7 +12682,7 @@ entering            q \xD7 sunlit glass area \xD7 SHGC   W</div>
     }
     const k = liveKind(L2);
     L2.nosol = k === "hv" ? !(specs.h || specs.v) : !specs[k];
-    liveApply(cutToWindow(specs));
+    liveApply(cutToWindow(k === "hv" ? eggCrate(specs, Fp) : specs));
   }
   var LIVE_VIEWS = { axon: 1, detail: 1, section: 1, plan: 1 };
   var LIVE_SRC = `<select class="livesrc" aria-label="Where the members come from" title="Live shading: the ideal members for the date and time set, remade as they change. Shade from chart: members sized from cut-off angles you drag on the sun path chart - the profile angle down from the top for horizontal members, each side in from the facade's edge for a fin on that jamb.">`;
@@ -12690,7 +12704,7 @@ entering            q \xD7 sunlit glass area \xD7 SHGC   W</div>
     }
     const L2 = S.live, chart = L2.src === "chart", cutN = chart && L2.cut ? ["th", "l", "r"].filter((k) => L2.cut[k] != null).join("") : "";
     const sig = [liveKind(L2), L2.f, L2.st, !!L2.auto, !!L2.nosol, L2.src, cutN, L2.ghost ? L2.ghost.label : "", L2.ext !== false].join("|");
-    const ext = `<label class="barchk" title="On: each member runs on past the window's edges as far as the sun slips along it, so the rule's cut-off holds across the whole glass. Off: the members stop at the window's edges, as a built design often would - and the sun comes round their ends."><input type="checkbox" class="liveext"${L2.ext !== false ? " checked" : ""}> Shading extends past window</label>`;
+    const ext = `<label class="barchk" title="On: each member runs on past the window's edges as far as the sun slips along it, so the rule's cut-off holds across the whole glass - and stops where a deeper member it meets already keeps that sun out. Off: the members stop at the window's edges, as a built design often would - and the sun comes round their ends."><input type="checkbox" class="liveext"${L2.ext !== false ? " checked" : ""}> Shading extends past window</label>`;
     const sl = (k, label) => `<label class="recn" title="How many members share the work: one deep member, or n each 1/n as deep at 1/n the spacing - the same count whichever kind is chosen"><span>${label}</span><input type="range" min="1" max="${MEMBERS_MAX}" step="1" value="${recUI.nh}" data-livn="${k}" aria-label="${label}"><output>${recUI.nh}</output></label>`;
     if (el.dataset.sig !== sig) {
       el.dataset.sig = sig;

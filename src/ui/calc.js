@@ -205,27 +205,47 @@ export function idealSpec(F, kind) {
   // and up a fin by d tan θ: the fin runs that far above the head
   return { dir: 'v', n, d, pitch, ext: Math.min(12, d * tT), side: gam > 0 ? 'end' : 'start', name: 'Ideal solution - ' + when };
 }
+/* Where blades and a fin meet at a jamb, the deeper trims the other. Sun that
+   slips under a blade's run past the jamb crosses the fin's plane on its way to
+   the glass nearer the wall than it crossed the blade's, and sun over the fin's
+   top above the head crosses the head's plane nearer the wall than it crossed
+   the fin's: so each need run on only by what its depth has over the other's -
+   the blade past that jamb by (d − Pd) tan γ, the fin above the head by
+   (Pd − d) tan θ - and none at all where the other is the deeper. */
+const runOn = (d, by, t) => Math.min(6, Math.round(Math.max(0, d - by) * t * 1000) / 1000);
+/** a blade run past its start and end jambs by eS and eE: its extension, and the shift that puts it there */
+const pastJambs = (sp, eS, eE) => Object.assign({}, sp, { ext: eS + eE, shift: (eE - eS) / 2 });
 /* From the chart: horizontal members for the profile angle θ set - one at the
    head as deep as h / tan θ, or n each 1/n of it at 1/n the spacing - and a fin
    on a jamb for each side's cut-off set: sun further round than γ off the
    normal is shaded by a fin w / tan γ deep, its vertical surface profile angle
-   ζ = 90° − γ. The blades run past the jambs and the fins up past the head as
+   ζ = 90° − γ. The blades run past each jamb and the fins up past the head as
    far as the sun the other cut lets through can slip along them, 60° where
-   none is set. 'l' is the chart's left of the normal, sun from the east of it. */
+   none is set, trimmed where they meet. 'l' is the chart's left of the normal,
+   sun from the east of it, its fin on the window's end jamb. */
 export function chartSpec(m, cut) {
-  const out = {}, tn = a => Math.tan(Math.min(a, 80) * D2R), FREE = 60;
+  const out = {}, tn = a => Math.tan(Math.min(a, 80) * D2R), FREE = 60, fin = {};
   if (!cut || !m.opening && !(m.winW > 0)) return out;
+  for (const k of ['l', 'r']) {
+    const d = cut[k] == null ? 0 : m.winW / Math.tan(cut[k] * D2R);
+    if (d > 0 && d <= IDEAL_MAX) fin[k] = d;
+  }
+  let dh = 0;
   if (cut.th != null) {
     const n = recUI.nh, pitch = m.winH / n, d = pitch / Math.tan(cut.th * D2R);
-    const g = Math.max(cut.l ?? FREE, cut.r ?? FREE);
-    if (d > 0 && d <= IDEAL_MAX) out.h = { dir: 'h', n, d, pitch, ext: Math.min(12, 2 * d * tn(g)), name: n === 1 ? 'Overhang' : 'Horizontal louvres' };
+    const run = k => runOn(d, fin[k] || 0, tn(cut[k] ?? FREE));
+    if (d > 0 && d <= IDEAL_MAX) { dh = d; out.h = pastJambs({ dir: 'h', n, d, pitch, name: n === 1 ? 'Overhang' : 'Horizontal louvres' }, run('r'), run('l')); }
   }
-  for (const k of ['l', 'r']) {
-    if (cut[k] == null) continue;
-    const d = m.winW / Math.tan(cut[k] * D2R);
-    if (d > 0 && d <= IDEAL_MAX) out['v' + k] = { dir: 'v', n: 1, d, pitch: m.winW, ext: Math.min(12, d * tn(cut.th ?? FREE)), side: k === 'l' ? 'end' : 'start', name: 'Fin' };
-  }
+  for (const k in fin) out['v' + k] = { dir: 'v', n: 1, d: fin[k], pitch: m.winW, ext: Math.min(12, Math.round(Math.max(0, fin[k] - dh) * tn(cut.th ?? FREE) * 1000) / 1000), side: k === 'l' ? 'end' : 'start', name: 'Fin' };
   return out;
+}
+/** the instant's blades and fins put on together, as an egg-crate: trimmed where they meet, at the jamb the sun comes round */
+export function eggCrate(sp, F) {
+  const { h, v } = sp;
+  if (!h || !v) return sp;
+  const gam = wrap180(F.cur.gf - F.cur.az), tg = Math.tan(Math.abs(gam) * D2R), tT = Math.tan(F.cur.vsa * D2R);
+  const far = runOn(h.d, 0, tg), near = runOn(h.d, v.d, tg), end = v.side === 'end';
+  return Object.assign({}, sp, { h: pastJambs(h, end ? far : near, end ? near : far), v: Object.assign({}, v, { ext: Math.min(12, Math.round(Math.max(0, v.d - h.d) * tT * 1000) / 1000) }) });
 }
 /** the ideal kept on the window and to the moment: on, the window carries it, remade as the date and time change */
 const liveBtn = (dir, on) => `<button type="button" class="minibtn idlive${on ? ' on' : ''}" data-live="${dir}" aria-pressed="${on}" title="Live shading: the window carries these ideal members, remade for every date and time you set or play through - its own shading set aside while it is on. Turn it off here, or from any view.">${on ? 'Live ●' : 'Live link'}</button>`;

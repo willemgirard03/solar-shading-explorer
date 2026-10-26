@@ -1257,6 +1257,8 @@ export function idealDevice(spec) {
   const D = Object.assign(DEVICE0(h ? 'h' : 'v'), { name: h ? (n === 1 ? 'Overhang' : 'Horizontal louvres') : (n === 1 ? 'Fin' : 'Vertical fins'),
     depth: r4(spec.d), thick: IDEAL_THICK, lenRel: true, len: r4(Math.max(0, spec.ext || 0)) },
     h ? { justV: 'start', justU: 'centre' } : { justU: spec.side === 'end' ? 'end' : 'start', justV: 'end' });
+  // a blade run further past one jamb than the other: shifted along the facade by half the difference
+  if (spec.shift && r4(spec.shift)) Object.assign(D, { offOn: true, offU: r4(spec.shift) });
   if (n > 1) D.arr = { along: 'facade', mode: 'count', count: n, spacing: r4(spec.pitch), len: r4((n - 1) * spec.pitch), ends: true };
   return D;
 }

@@ -55,7 +55,7 @@ import { SYSTEM_PRESETS, usage, entryName, defaultName } from './library.js';
 import { deviceLabel } from './geometry/device.js';
 import { openFloatEdit, openNudge, openAsk, openName, buildRail, buildCalcBar, RESULT_SCOPES, syncRail, syncClock, wireRail, copyUI, brkUI, regsControls } from './ui/rail.js';
 import { stackLabel } from './ui/readout.js';
-import { recSun, recGeometry, recBylaw, recFor, resGain, fxUI, recUI, idealSpec, chartSpec } from './ui/calc.js';
+import { recSun, recGeometry, recBylaw, recFor, resGain, fxUI, recUI, idealSpec, chartSpec, eggCrate } from './ui/calc.js';
 import { renderChecks, renderEnergy, staticProse } from './ui/prose.js';
 import { wireView, viewPoint } from './ui/interact.js';
 import { exportRhino } from './export/rhino.js';
@@ -551,7 +551,7 @@ function liveUpdate() {
   const onFacade = sp.alt > 0 && Math.cos(liveWrap(gf - sp.az) * Math.PI / 180) > 0;
   // from the chart: what the cut-offs set ask for, whatever the hour
   // off, every member stops at the window's edges: what the rule asks for, cut to what the window looks like
-  const cutToWindow = sp => { if (L.ext === false) for (const k in sp) if (sp[k]) sp[k] = Object.assign({}, sp[k], { ext: 0 }); return sp; };
+  const cutToWindow = sp => { if (L.ext === false) for (const k in sp) if (sp[k]) sp[k] = Object.assign({}, sp[k], { ext: 0, shift: 0 }); return sp; };
   if (L.src === 'chart') { L.n = recUI.nh; L.nosol = false; liveApply(cutToWindow(chartSpec(m, L.cut))); return; }
   const Fp = { m, cur: { gf, az: sp.az, vsa: getValue('theta', st2), onFacade }, date: liveDate(S.doy), S };
   const specs = { h: idealSpec(Fp, 'h'), v: idealSpec(Fp, 'v'), c: idealSpec(Fp, 'c') };
@@ -566,7 +566,7 @@ function liveUpdate() {
   }
   const k = liveKind(L);
   L.nosol = k === 'hv' ? !(specs.h || specs.v) : !specs[k];
-  liveApply(cutToWindow(specs));
+  liveApply(cutToWindow(k === 'hv' ? eggCrate(specs, Fp) : specs));
 }
 /* While it is on, every view says so along its top: the member counts to the
    left, and the way to turn it off to the right. */
@@ -585,7 +585,7 @@ function liveBar(inst) {
   if (!el) { el = document.createElement('div'); el.className = 'livebar'; inst.el.querySelector('.v3dbar').appendChild(el); }
   const L = S.live, chart = L.src === 'chart', cutN = chart && L.cut ? ['th', 'l', 'r'].filter(k => L.cut[k] != null).join('') : '';
   const sig = [liveKind(L), L.f, L.st, !!L.auto, !!L.nosol, L.src, cutN, L.ghost ? L.ghost.label : '', L.ext !== false].join('|');
-  const ext = `<label class="barchk" title="On: each member runs on past the window's edges as far as the sun slips along it, so the rule's cut-off holds across the whole glass. Off: the members stop at the window's edges, as a built design often would - and the sun comes round their ends."><input type="checkbox" class="liveext"${L.ext !== false ? ' checked' : ''}> Shading extends past window</label>`;
+  const ext = `<label class="barchk" title="On: each member runs on past the window's edges as far as the sun slips along it, so the rule's cut-off holds across the whole glass - and stops where a deeper member it meets already keeps that sun out. Off: the members stop at the window's edges, as a built design often would - and the sun comes round their ends."><input type="checkbox" class="liveext"${L.ext !== false ? ' checked' : ''}> Shading extends past window</label>`;
   const sl = (k, label) => `<label class="recn" title="How many members share the work: one deep member, or n each 1/n as deep at 1/n the spacing - the same count whichever kind is chosen"><span>${label}</span><input type="range" min="1" max="${MEMBERS_MAX}" step="1" value="${recUI.nh}" data-livn="${k}" aria-label="${label}"><output>${recUI.nh}</output></label>`;
   if (el.dataset.sig !== sig) {
     el.dataset.sig = sig;
@@ -1474,3 +1474,5 @@ document.addEventListener('click', e => {
   const d = b.closest('details'); if (d) d.open = false;
   startTour(b.dataset.guide === 'example' ? EXAMPLE : TOUR);
 });
+
+

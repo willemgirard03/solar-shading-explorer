@@ -778,6 +778,12 @@ export function drawAxon(F) {
       // every storey band of the face can be clicked to select it
       hits.push({ f: key, st, unit: null, d: -1e9 + st, pts: band });
     }
+    /* the roof of this storey: what the next one does not cover shows, and a click on it selects the storey.
+       Drawn before its windows: on a footprint with no re-entrant corner nothing in front of a wall seen can be
+       behind its roof, but a member rising past the roof - a fin above the head - stands in front of it */
+    const top = fo.pts.map(p => P([p[0], p[1], fo.z1]));
+    g += POLY(top, { fill: '#F6F8F7', stroke: 'var(--ink)', w: st === S.storeys.length - 1 ? 1 : .7 });
+    hits.push({ f: S.sel.f, st, unit: null, roof: true, d: -1e9 + st + 0.5, pts: top });
     const drawn = byStorey[st].sort((a, b) => depth(a) - depth(b));
     // glass over the by-law's SHGC is drawn red, as a device the by-law does not allow is
     for (const u of drawn) g += paintFaces(order(u.back(), u.f, u.st, GLASS_GROUP), proj(u), eLoc(u.f, u.st),
@@ -803,10 +809,6 @@ export function drawAxon(F) {
       }
       else if (u.broken) g += POLY(pts, { fill: 'none', stroke: 'var(--sun)', w: 1.2, dash: '3 2' });
     }
-    // the roof of this storey: what the next one does not cover shows, and a click on it selects the storey
-    const top = fo.pts.map(p => P([p[0], p[1], fo.z1]));
-    g += POLY(top, { fill: '#F6F8F7', stroke: 'var(--ink)', w: st === S.storeys.length - 1 ? 1 : .7 });
-    hits.push({ f: S.sel.f, st, unit: null, roof: true, d: -1e9 + st + 0.5, pts: top });
   }
   if (seenSel) {
     const fr = sel.row.frame, r = sel.row;
