@@ -2156,15 +2156,16 @@ label.tipped{display:inline}
   // src/sunpick.js
   var samples = { key: "", pts: null };
   function sunSamples(mode) {
-    if (samples.key === mode) return samples.pts;
+    const key = mode + "|" + SITE.key;
+    if (samples.key === key) return samples.pts;
     const pts = [];
-    for (let doy = 1; doy <= 365; doy += 3) for (let t = 2; t <= 22.001; t += 0.2) {
+    for (let doy = 1; doy <= 365; doy += 3) for (let t = 0; t <= 24.001; t += 0.2) {
       const sp = solarPosition(doy, t, mode);
       if (sp.alt <= 0) continue;
       const v = sunVec(sp.alt, sp.az);
       pts.push([doy, t, sp.alt, sp.az, v[0], v[1], v[2]]);
     }
-    samples = { key: mode, pts };
+    samples = { key, pts };
     return pts;
   }
   function pickSunAt(S2, alt, az) {
@@ -6044,24 +6045,32 @@ label.tipped{display:inline}
         const t = t0 + (t1 - t0) * i / 240, b = bearing(solarPosition(doy, t, mode).az);
         pts.push([t, G2.px(clamp(b, G2.AZ0, G2.AZ1))]);
       }
-      for (let i = 1; i < pts.length; i++) if (pts[i][1] < pts[i - 1][1]) pts[i][1] = pts[i - 1][1];
+      const dir = pts[pts.length - 1][1] >= pts[0][1] ? 1 : -1, U = pts.map(([t, x]) => [t, dir * x]);
+      for (let i = 1; i < U.length; i++) if (U[i][1] < U[i - 1][1]) U[i][1] = U[i - 1][1];
       const lerp = (x, i, j) => {
-        const a = pts[i - 1], b = pts[i];
+        const a = U[i - 1], b = U[i];
         const s = (x - a[j]) / (b[j] - a[j] || 1e-9);
         return a[1 - j] + (b[1 - j] - a[1 - j]) * s;
       };
       const find = (x, j) => {
         let i = 1;
-        while (i < pts.length - 1 && pts[i][j] < x) i++;
+        while (i < U.length - 1 && U[i][j] < x) i++;
         return i;
       };
+      const xr = dir * U[0][1], xs = dir * U[U.length - 1][1];
       v = {
         t0,
         t1,
-        x0: pts[0][1],
-        x1: pts[pts.length - 1][1],
-        x: (t) => t <= t0 ? pts[0][1] : t >= t1 ? pts[pts.length - 1][1] : lerp(t, find(t, 0), 0),
-        t: (x) => x <= pts[0][1] ? t0 : x >= pts[pts.length - 1][1] ? t1 : lerp(x, find(x, 1), 1)
+        dir,
+        xr,
+        xs,
+        x0: Math.min(xr, xs),
+        x1: Math.max(xr, xs),
+        x: (t) => dir * (t <= t0 ? U[0][1] : t >= t1 ? U[U.length - 1][1] : lerp(t, find(t, 0), 0)),
+        t: (x) => {
+          const u = dir * x;
+          return u <= U[0][1] ? t0 : u >= U[U.length - 1][1] ? t1 : lerp(u, find(u, 1), 1);
+        }
       };
     }
     strip = { key, v };
@@ -6334,7 +6343,10 @@ label.tipped{display:inline}
     const ds = getDaySpan(TG, doy, S2.timeMode), spans = litSpans(lit), st = dayStrip(G2, doy, S2.timeMode);
     g += T(X0, TY - 14, "The selected day, " + CLOCK_NAME[S2.timeMode] + " clock, under the sun\u2019s bearing", { size: 9.5, fill: "var(--ink2)", mono: false });
     if (st) {
-      const sx = (t) => st.x(t), bar = (t0, t1, o) => RECT(sx(t0), TY, Math.max(1, sx(t1) - sx(t0)), 13, o);
+      const sx = (t) => st.x(t), bar = (t0, t1, o) => {
+        const a = sx(t0), c = sx(t1);
+        return RECT(Math.min(a, c), TY, Math.max(1, Math.abs(c - a)), 13, o);
+      };
       if (st.x0 > X0) g += RECT(X0, TY, st.x0 - X0, 13, { fill: "var(--ink3)", opacity: 0.28 });
       if (st.x1 < X1) g += RECT(st.x1, TY, X1 - st.x1, 13, { fill: "var(--ink3)", opacity: 0.28 });
       g += RECT(st.x0, TY, st.x1 - st.x0, 13, { fill: "var(--sunsoft)", stroke: "var(--rule)", "stroke-width": 0.7 });
@@ -6350,13 +6362,13 @@ label.tipped{display:inline}
       hrs.forEach((h) => {
         const x = sx(h);
         g += L(x, TY + 13, x, TY + 17, { stroke: "var(--ink3)", w: 0.6 });
-        if (x - lastX >= 17) {
+        if (Math.abs(x - lastX) >= 17) {
           g += T(x, TY + 26, String(h), { anchor: "middle", size: 8, fill: "var(--ink3)" });
           lastX = x;
         }
       });
-      g += T(st.x0 - 4, TY + 10, hhmm(ds.rise), { anchor: "end", size: 7.5, fill: "var(--ink3)" });
-      g += T(st.x1 + 4, TY + 10, hhmm(ds.set), { size: 7.5, fill: "var(--ink3)" });
+      g += T(st.xr - 4 * st.dir, TY + 10, hhmm(ds.rise), { anchor: st.dir > 0 ? "end" : "start", size: 7.5, fill: "var(--ink3)" });
+      g += T(st.xs + 4 * st.dir, TY + 10, hhmm(ds.set), { anchor: st.dir > 0 ? "start" : "end", size: 7.5, fill: "var(--ink3)" });
     } else g += RECT(X0, TY, X1 - X0, 13, { fill: "var(--ink3)", opacity: 0.28 }) + T(X0 + 4, TY + 10, "the sun does not rise", { size: 8.5, fill: "var(--ink2)" });
     g += T(X1, TY - 14, ds.rise === null ? "no sunrise" : "rise " + hhmm(ds.rise) + "  set " + hhmm(ds.set), { anchor: "end", size: 8.5, fill: "var(--ink3)" });
     cache2 = { key: fast ? "" : key, svg: g, ds, lit };

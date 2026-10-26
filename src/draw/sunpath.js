@@ -110,9 +110,10 @@ export function sunGeom(gf, wide = false) {
 
 /* The day strip under the chart is laid on the chart's own axis: each moment
    sits under the bearing the sun has then, so the strip stretches from the
-   sunrise bearing to the sunset bearing and shortens toward winter. At this
-   latitude the bearing only ever increases through a day, so the mapping runs
-   both ways - the clock can be scrubbed along it. */
+   sunrise bearing to the sunset bearing and shortens toward winter. The
+   bearing only ever runs one way through a day - left to right on a chart
+   facing south, right to left on one facing north - so the mapping runs both
+   ways and the clock can be scrubbed along it. */
 let strip = { key: '', v: null };
 export function dayStrip(G, doy, mode) {
   const key = doy + '|' + mode + '|' + G.AZ0 + '|' + G.X0 + ',' + G.X1;
@@ -125,12 +126,15 @@ export function dayStrip(G, doy, mode) {
       const t = t0 + (t1 - t0) * i / 240, b = bearing(solarPosition(doy, t, mode).az);
       pts.push([t, G.px(clamp(b, G.AZ0, G.AZ1))]);
     }
-    for (let i = 1; i < pts.length; i++) if (pts[i][1] < pts[i - 1][1]) pts[i][1] = pts[i - 1][1];
-    const lerp = (x, i, j) => { const a = pts[i - 1], b = pts[i]; const s = (x - a[j]) / ((b[j] - a[j]) || 1e-9); return a[1 - j] + (b[1 - j] - a[1 - j]) * s; };
-    const find = (x, j) => { let i = 1; while (i < pts.length - 1 && pts[i][j] < x) i++; return i; };
-    v = { t0, t1, x0: pts[0][1], x1: pts[pts.length - 1][1],
-      x: t => t <= t0 ? pts[0][1] : t >= t1 ? pts[pts.length - 1][1] : lerp(t, find(t, 0), 0),
-      t: x => x <= pts[0][1] ? t0 : x >= pts[pts.length - 1][1] ? t1 : lerp(x, find(x, 1), 1) };
+    // worked in the direction the day runs on the chart, then turned back
+    const dir = pts[pts.length - 1][1] >= pts[0][1] ? 1 : -1, U = pts.map(([t, x]) => [t, dir * x]);
+    for (let i = 1; i < U.length; i++) if (U[i][1] < U[i - 1][1]) U[i][1] = U[i - 1][1];
+    const lerp = (x, i, j) => { const a = U[i - 1], b = U[i]; const s = (x - a[j]) / ((b[j] - a[j]) || 1e-9); return a[1 - j] + (b[1 - j] - a[1 - j]) * s; };
+    const find = (x, j) => { let i = 1; while (i < U.length - 1 && U[i][j] < x) i++; return i; };
+    const xr = dir * U[0][1], xs = dir * U[U.length - 1][1];
+    v = { t0, t1, dir, xr, xs, x0: Math.min(xr, xs), x1: Math.max(xr, xs),
+      x: t => dir * (t <= t0 ? U[0][1] : t >= t1 ? U[U.length - 1][1] : lerp(t, find(t, 0), 0)),
+      t: x => { const u = dir * x; return u <= U[0][1] ? t0 : u >= U[U.length - 1][1] ? t1 : lerp(u, find(u, 1), 1); } };
   }
   strip = { key, v };
   return v;
@@ -418,7 +422,7 @@ function backdrop(F, G) {
   const ds = getDaySpan(TG, doy, S.timeMode), spans = litSpans(lit), st = dayStrip(G, doy, S.timeMode);
   g += T(X0, TY - 14, 'The selected day, ' + CLOCK_NAME[S.timeMode] + ' clock, under the sun’s bearing', { size: 9.5, fill: 'var(--ink2)', mono: false });
   if (st) {
-    const sx = t => st.x(t), bar = (t0, t1, o) => RECT(sx(t0), TY, Math.max(1, sx(t1) - sx(t0)), 13, o);
+    const sx = t => st.x(t), bar = (t0, t1, o) => { const a = sx(t0), c = sx(t1); return RECT(Math.min(a, c), TY, Math.max(1, Math.abs(c - a)), 13, o); };
     // before sunrise and after sunset, the strip runs on to the chart's ends in the night's colour
     if (st.x0 > X0) g += RECT(X0, TY, st.x0 - X0, 13, { fill: 'var(--ink3)', opacity: .28 });
     if (st.x1 < X1) g += RECT(st.x1, TY, X1 - st.x1, 13, { fill: 'var(--ink3)', opacity: .28 });
@@ -432,10 +436,11 @@ function backdrop(F, G) {
     hrs.forEach(h => {
       const x = sx(h);
       g += L(x, TY + 13, x, TY + 17, { stroke: 'var(--ink3)', w: .6 });
-      if (x - lastX >= 17) { g += T(x, TY + 26, String(h), { anchor: 'middle', size: 8, fill: 'var(--ink3)' }); lastX = x; }
+      if (Math.abs(x - lastX) >= 17) { g += T(x, TY + 26, String(h), { anchor: 'middle', size: 8, fill: 'var(--ink3)' }); lastX = x; }
     });
-    g += T(st.x0 - 4, TY + 10, hhmm(ds.rise), { anchor: 'end', size: 7.5, fill: 'var(--ink3)' });
-    g += T(st.x1 + 4, TY + 10, hhmm(ds.set), { size: 7.5, fill: 'var(--ink3)' });
+    // sunrise at the strip's eastern end, sunset at its western
+    g += T(st.xr - 4 * st.dir, TY + 10, hhmm(ds.rise), { anchor: st.dir > 0 ? 'end' : 'start', size: 7.5, fill: 'var(--ink3)' });
+    g += T(st.xs + 4 * st.dir, TY + 10, hhmm(ds.set), { anchor: st.dir > 0 ? 'start' : 'end', size: 7.5, fill: 'var(--ink3)' });
   } else g += RECT(X0, TY, X1 - X0, 13, { fill: 'var(--ink3)', opacity: .28 }) + T(X0 + 4, TY + 10, 'the sun does not rise', { size: 8.5, fill: 'var(--ink2)' });
   g += T(X1, TY - 14, ds.rise === null ? 'no sunrise' : 'rise ' + hhmm(ds.rise) + '  set ' + hhmm(ds.set), { anchor: 'end', size: 8.5, fill: 'var(--ink3)' });
   cache = { key: fast ? '' : key, svg: g, ds, lit };

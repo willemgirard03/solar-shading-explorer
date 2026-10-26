@@ -3,19 +3,21 @@
    for one by angle, so each is turned back into a date and a time here. */
 
 import { clamp } from './util.js';
-import { solarPosition, sunVec } from './solar.js';
+import { solarPosition, sunVec, SITE } from './solar.js';
 
 let samples = { key: '', pts: null };
+// sampled for the clock and the place: a weather file from elsewhere moves every sun there is
 export function sunSamples(mode) {
-  if (samples.key === mode) return samples.pts;
+  const key = mode + '|' + SITE.key;
+  if (samples.key === key) return samples.pts;
   const pts = [];
-  for (let doy = 1; doy <= 365; doy += 3) for (let t = 2; t <= 22.001; t += 0.2) {
+  for (let doy = 1; doy <= 365; doy += 3) for (let t = 0; t <= 24.001; t += 0.2) {
     const sp = solarPosition(doy, t, mode);
     if (sp.alt <= 0) continue;
     const v = sunVec(sp.alt, sp.az);
     pts.push([doy, t, sp.alt, sp.az, v[0], v[1], v[2]]);
   }
-  samples = { key: mode, pts };
+  samples = { key, pts };
   return pts;
 }
 
